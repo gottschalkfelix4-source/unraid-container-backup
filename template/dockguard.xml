@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>container-backup</Name>
+  <Name>dockguard</Name>
   <Author>Felix Gottschalk</Author>
   <Support>https://github.com/gottschalkfelix4-source/unraid-container-backup</Support>
-  <Overview>Docker-Container sicher auf einen anderen Server (SMB-Share oder S3) sichern und mit einem Klick wiederherstellen – inklusive Daten an den Originalpfaden, Unraid-Community-App-Template und exakter Container-Konfiguration (Image, Ports, Environment, Netzwerk, Labels). Nach einem kompletten Löschen stellt der Container sich selbst und die App wieder so her, als wäre nichts passiert.
+  <Overview>DockGuard – Docker-Container sicher auf einen anderen Server (SMB-Share oder S3) sichern und mit einem Klick wiederherstellen – inklusive Daten an den Originalpfaden, Unraid-Community-App-Template und exakter Container-Konfiguration (Image, Ports, Environment, Netzwerk, Labels). Nach einem kompletten Löschen stellt der Container sich selbst und die App wieder so her, als wäre nichts passiert.
 
 Sicherung: Jeder Container wird als einzelne .tar-Datei mit vollständigem docker inspect, allen Bind-Mounts/Volumes und dem Unraid-Template gesichert. Uploads laufen atomar (erst .part, dann Umbenennen) mit optionaler Größenverifizierung.
 
@@ -11,13 +11,13 @@ Restore: Daten an die Originalpfade zurück, Template nach /boot/config/plugins/
 
 Geplanter Lauf per Cron (UTC), Aufbewahrung (Retention), parallele Backups, Bandbreitenlimit und Mount-Ausschlüsse sind über die Web-UI konfigurierbar.
 
-ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host – nur im vertrauenswürdigen LAN betreiben. Image lokal bauen: ./build.sh (bzw. docker build -t unraid-container-backup:latest .)</Overview>
+ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host – nur im vertrauenswürdigen LAN betreiben. Image lokal bauen: ./build.sh (bzw. docker build -t dockguard:latest .)</Overview>
   <Category>Backup:Utilities:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <Icon>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/icon.png</Icon>
-  <TemplateURL>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/unraid-container-backup.xml</TemplateURL>
+  <TemplateURL>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml</TemplateURL>
   <Registry>https://github.com/gottschalkfelix4-source/unraid-container-backup</Registry>
-  <Repository>unraid-container-backup:latest</Repository>
+  <Repository>dockguard:latest</Repository>
   <Privileged>false</Privileged>
   <RequiresVariant>false</RequiresVariant>
   <BlkioWeight>500</BlkioWeight>
@@ -27,7 +27,7 @@ ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über
   <Config Name="Web-UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port der Weboberfläche" Type="Port" Display="always" Required="true" Mask="false"/>
 
   <!-- ============ Pfade ============ -->
-  <Config Name="Config-Verzeichnis" Target="/config" Default="/mnt/user/appdata/container-backup" Mode="rw" Description="Einstellungen (settings.json) und rclone-Konfiguration" Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Config-Verzeichnis" Target="/config" Default="/mnt/user/appdata/dockguard" Mode="rw" Description="Einstellungen (settings.json) und rclone-Konfiguration" Type="Path" Display="always" Required="true" Mask="false"/>
   <Config Name="Docker-Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Docker-API – notwendig für Backup/Restore (erfordert Root-Zugriff)" Type="Path" Display="always" Required="true" Mask="false"/>
   <Config Name="User-Daten (/mnt/user)" Target="/mnt/user" Default="/mnt/user" Mode="rw" Description="Container-Daten und Unraid-Shares – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Boot-Config (/boot/config)" Target="/boot/config" Default="/boot/config" Mode="rw" Description="Unraid-Templates aus plugins/dockerMan/templates-user – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
@@ -71,7 +71,7 @@ ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über
   <Config Name="Zeitplan (Cron, UTC)" Target="BACKUP_SCHEDULE" Default="0 3 * * *" Description="z. B. '0 3 * * *' taeglich 03:00 · '0 */6 * * *' alle 6 h · '0 2 * * 0' sonntags 02:00" Type="Variable" Display="always" Required="false" Mask="false"/>
   <Config Name="Backups behalten" Target="BACKUP_KEEP" Default="7" Description="Backups pro Container behalten, 0 = alle" Type="Variable" Display="always" Required="false" Mask="false"/>
   <Config Name="Parallele Backups" Target="BACKUP_PARALLEL" Default="2" Description="Container gleichzeitig sichern (1-16)" Type="Variable" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Ausgeschlossene Container" Target="EXCLUDE_CONTAINERS" Default="container-backup" Description="Kommagetrennte Namen, die nie gesichert werden" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Ausgeschlossene Container" Target="EXCLUDE_CONTAINERS" Default="dockguard,container-backup" Description="Kommagetrennte Namen, die nie gesichert werden" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Ausgeschlossene Mounts" Target="EXCLUDE_MOUNTS" Default="" Description="Mounts ueberspringen, deren Quelle oder Ziel einen Ausdruck enthaelt, z. B. '/cache, /transcode'" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Upload-Bandbreitenlimit" Target="RCLONE_BWLIMIT" Default="" Description="rclone-Syntax, z. B. 8M oder 500K – leer = unbegrenzt" Type="Variable" Display="advanced" Required="false" Mask="false"/>
   <Config Name="Upload-Verifizierung" Target="VERIFY_UPLOAD" Default="1" Description="Groessencheck nach dem Upload (1 = an, 0 = aus)" Type="Variable" Display="advanced" Required="false" Mask="false">

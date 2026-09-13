@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Unraid Container Backup</title>
+<title>DockGuard – Unraid Container Backup</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="%2338bdf8"/><path d="M16 6l8 4v6.5c0 4.8-3.4 7.4-7.6 8.9a1.2 1.2 0 0 1-.8 0C11.4 23.9 8 21.3 8 16.5V10z" fill="white" opacity=".95"/><path d="M11.5 16l3.2 3.2 5.8-5.8" stroke="%2338bdf8" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'>
 <style>
   /* ============ Design-Tokens ============ */
@@ -526,7 +526,7 @@
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-logo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div>
-      <div><b>Container Backup</b><span>for Unraid</span></div>
+      <div><b>DockGuard</b><span>Unraid Container Backup</span></div>
     </div>
     <nav>
       <button class="nav-item" data-page="dashboard"><span data-ico="dashboard"></span><span class="nav-label">Übersicht</span></button>
@@ -730,7 +730,7 @@
           <div class="section-title"><span data-ico="filter"></span> Ausschlüsse</div>
           <div class="form-row">
             <label><b>Ausgeschlossene Container</b><small>Kommagetrennte Namen, die nie gesichert werden</small></label>
-            <div class="ctrl"><input type="text" id="exclude" placeholder="container-backup"><div class="hint">Standard: <code>container-backup</code> (sich selbst nie sichern)</div></div>
+            <div class="ctrl"><input type="text" id="exclude" placeholder="dockguard"><div class="hint">Standard: <code>dockguard,container-backup</code> (sich selbst nie sichern)</div></div>
           </div>
           <div class="form-row">
             <label><b>Auszuschließende Mounts</b><small>Mounts, deren Quelle oder Ziel einen dieser Ausdrücke enthält (Kommagetrennt) – z. B. Caches</small></label>
@@ -1070,7 +1070,7 @@ function renderSidebar() {
   const jb = $("#navJobsBadge");
   if (runningJobs) { jb.textContent = runningJobs + " läuft"; jb.className = "badge blue"; }
   else { jb.textContent = ""; jb.className = "badge gray hidden"; }
-  document.title = runningJobs ? `(${runningJobs}) Unraid Container Backup` : "Unraid Container Backup";
+  document.title = runningJobs ? `(${runningJobs}) DockGuard – Unraid Container Backup` : "DockGuard – Unraid Container Backup";
 }
 
 function emptyState(ico, title, text) {

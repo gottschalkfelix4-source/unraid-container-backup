@@ -31,7 +31,7 @@ except ValueError as exc:
 
 storage = Storage(cfg)
 scheduler = None
-app = FastAPI(title="Unraid Container Backup", version=__version__)
+app = FastAPI(title="DockGuard – Unraid Container Backup", version=__version__)
 
 _BACKUP_TS_RE = re.compile(r"_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.tar$")
 
@@ -56,7 +56,7 @@ if cfg.web_password:
             return JSONResponse(
                 {"detail": "Unauthorized"},
                 status_code=401,
-                headers={"WWW-Authenticate": 'Basic realm="container-backup"'},
+                headers={"WWW-Authenticate": 'Basic realm="dockguard"'},
             )
         return await call_next(request)
 

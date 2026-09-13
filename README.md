@@ -1,10 +1,38 @@
-# Unraid Container Backup
+<p align="center">
+  <img src="template/icon.png" width="140" alt="DockGuard Logo">
+</p>
 
-Ein Backup-Tool als Docker-Container für Unraid, das Docker-Container auf einen anderen Server sichert – per **SMB-Share** oder **S3-Storage** – und sie nach einem kompletten Löschen **mit einem Klick wiederherstellt**:
+<h1 align="center">DockGuard</h1>
+
+<p align="center">
+  <b>Sichere deine Unraid-Docker-Container auf einen anderen Server – und stelle sie mit einem Klick wieder her.</b><br>
+  <i>Daten an den Originalpfaden, Unraid-Template und exakte Container-Konfiguration – als wäre nichts passiert.</i>
+</p>
+
+---
+
+DockGuard ist ein Backup-Tool als Docker-Container für Unraid. Es sichert jeden Container auf einen anderen Server – per **SMB-Share** oder **S3-Storage** – und stellt ihn nach einem kompletten Löschen **mit einem Klick wieder her**:
 
 - **Daten** an den Originalpfaden (Bind-Mounts & benannte Volumes)
-- **Unraid-Template** (Community Apps) aus `templates-user`
+- **Unraid-Template** (Community Apps) aus `templates-user` – der Container erscheint danach wieder in der Docker-UI
 - **Container** selbst: Image, Ports, Environment, Netzwerk, Restart-Policy, Labels – exakt wie vorher
+
+<div align="center">
+  <img src="template/icon.png" width="140" alt="DockGuard Logo">
+</div>
+
+## Features
+
+| | |
+|---|---|
+| 🗂️ **SMB oder S3** | Ziel per rclone: NAS/Samba-Shares oder S3-kompatible Speicher (AWS, Minio, Garage, Wasabi, …) |
+| ⏱️ **Cron-Planung** | Automatische Backups im UTC-Zeitplan, inkl. Aufbewahrung (Retention) |
+| ⚡ **Parallele Backups** | Mehrere Container gleichzeitig sichern (1–16 Worker) |
+| 🔒 **Atomare Uploads** | Backups werden erst als `.part` hochgeladen, dann umbenannt – und optional per Größencheck verifiziert. Halbfertige Uploads erscheinen nie als gültiges Backup |
+| 🔐 **Secret-Masking** | Passwörter & Access-Keys werden in der Web-UI nie im Klartext angezeigt |
+| 🌐 **Restore auf frischem Server** | Fehlende Docker-Netzwerke (inkl. Aliase) werden automatisch rekonstruiert |
+| 🖥️ **Komplette Web-UI** | Dashboard, Container-Karten, Backup-Verwaltung, Einstellungs-Assistent, Live-Job-Logs – ohne externe Abhängigkeiten |
+| 🧪 **Umfangreich getestet** | 57 automatische Tests für Backup-/Restore-Logik, Sicherheit und UI |
 
 ## Funktionsweise
 
@@ -13,19 +41,17 @@ Jedes Backup eines Containers ist eine einzelne `.tar`-Datei im Speicherziel:
 ```
 <ziel>/<container-name>/
 └── <container-name>_20260913_030000.tar
-    ├── meta.json        # vollständiges docker inspect + Mount-Liste
+    ├── meta.json        # vollständiges docker inspect + Mount-Liste + Template
     └── volumes/
         ├── mnt_user_appdata_jellyfin.tar.gz
         └── ...
 ```
 
-Das Unraid-Template (XML) wird beim Backup mit in `meta.json` aufgenommen und beim Restore nach `/boot/config/plugins/dockerMan/templates-user/` zurückgeschrieben – der Container erscheint danach wieder in der Unraid-Docker-UI wie vorher.
-
 **Restore-Ablauf (ein Klick in der Web-UI):**
 1. Neuestes (oder gewähltes) Backup wird heruntergeladen
-2. Daten werden an die Originalpfade extrahiert
-3. Template wird wiederhergestellt
-4. Image wird bei Bedarf neu gezogen
+2. Daten werden an die Originalpfade extrahiert (mit Traversal-Schutz)
+3. Unraid-Template wird wiederhergestellt (`templates-user`)
+4. Image wird bei Bedarf neu gezogen, fehlende Netzwerke werden rekonstruiert
 5. Container wird exakt wie vorher neu angelegt und gestartet
 
 ## Installation
@@ -36,35 +62,27 @@ Auf dem Unraid-Host (oder einem anderen Docker-Host):
 
 ```bash
 ./build.sh
-# oder: docker build -t unraid-container-backup:latest .
+# oder: docker build -t dockguard:latest .
 ```
 
-### 1b. Unraid-Template (Community Apps)
+### 2. Unraid-Template (Community Apps)
 
-Ein fertiges Template liegt unter [`template/unraid-container-backup.xml`](template/unraid-container-backup.xml). Installation:
+Das fertige Template liegt unter [`template/dockguard.xml`](template/dockguard.xml) – es enthält bereits alle Felder (Ziel, Zeitplan, Ausschlüsse, Login) und das **DockGuard-Icon**, das Unraid auch als Container-Icon verwendet.
 
-1. Die Datei nach `/boot/config/plugins/dockerMan/templates-user/` kopieren
-2. In der Unraid-Docker-UI („Docker“ → „Add Container“) erscheint **container-backup** als Vorlage
-3. Image `unraid-container-backup:latest` auswählen, die Zugangsdaten eintragen und loslegen
+**Option A – Community Apps:** Template-Datei nach `/boot/config/plugins/dockerMan/templates-user/` kopieren. In der Docker-UI („Add Container“) erscheint die Vorlage **dockguard** mit Icon und allen Einstellungen.
 
-Alle Optionen (SMB/S3-Ziel, Zeitplan, Aufbewahrung, Parallelität, Ausschlüsse, Login) sind als Felder im Template enthalten. Alternativ lässt sich das Template über den Community-Apps-Modus („Install from file“) importieren.
-
-### 2. Container anlegen
-
-**Variante A – Compose Manager** (empfohlen): `unraid-compose.yml` anpassen und importieren.
-
-**Variante B – Docker-GUI:**
+**Option B – Manuell:**
 
 | Feld | Wert |
 |---|---|
-| Repository | `unraid-container-backup:latest` |
-| Container-Name | `container-backup` |
+| Repository | `dockguard:latest` |
+| Container-Name | `dockguard` |
 | Host-Port | `8080` → Container-Port `8080` |
 | Volume 1 | `/var/run/docker.sock` → `/var/run/docker.sock` |
 | Volume 2 | `/mnt/user` → `/mnt/user` |
 | Volume 3 | `/boot/config` → `/boot/config` |
 | Volume 4 | `/var/lib/docker/volumes` → `/var/lib/docker/volumes` |
-| Extra-Parameter | `-e BACKUP_TYPE=smb -e SMB_HOST=... -e SMB_USER=... -e SMB_PASS=... -e SMB_SHARE=... -e BACKUP_SCHEDULE="0 3 * * *"` |
+| Volume 5 | `/mnt/user/appdata/dockguard` → `/config` |
 
 > **Wichtig:** Das Tool braucht Zugriff auf den Docker-Socket (= Root-Rechte auf dem Host) sowie Schreibzugriff auf `/mnt/user`, `/boot/config` und `/var/lib/docker/volumes` für den Restore.
 
@@ -88,12 +106,13 @@ Alle Optionen (SMB/S3-Ziel, Zeitplan, Aufbewahrung, Parallelität, Ausschlüsse,
 | `BACKUP_SCHEDULE` | `0 3 * * *` | Cron-Ausdruck (UTC), z. B. `0 */6 * * *` = alle 6 h |
 | `BACKUP_KEEP` | `0` | Backups pro Container behalten (`0` = alle) |
 | `BACKUP_PARALLEL` | `2` | Container gleichzeitig sichern (1–16) |
-| `EXCLUDE_CONTAINERS` | `container-backup` | Kommagetrennte Namen, die nicht gesichert werden |
+| `EXCLUDE_CONTAINERS` | `dockguard,container-backup` | Kommagetrennte Namen, die nicht gesichert werden |
 | `EXCLUDE_MOUNTS` | `""` | Kommagetrennte Ausdrücke; Mounts, deren Quelle oder Ziel sie enthalten, werden übersprungen (z. B. Caches) |
 | `TEMPLATES_DIR` | `/boot/config/plugins/dockerMan/templates-user` | Pfad(e) zu den Unraid-Templates, mehrere kommagetrennt möglich (Restore schreibt ins erste) |
 | `RCLONE_TIMEOUT` | `7200` | Timeout pro rclone-Befehl in Sekunden |
 | `RCLONE_BWLIMIT` | `""` | Upload-Bandbreitenlimit (rclone-Syntax, z. B. `8M`, `500K`), leer = unbegrenzt |
 | `VERIFY_UPLOAD` | `1` | Größencheck des Backups auf dem Ziel nach dem Upload (`0` = aus) |
+| `STAGING_DIR` | `/staging` | Temporäre Ablage während Backup/Restore |
 | `WEB_PORT` | `8080` | Port der Web-UI |
 | `WEB_USER` / `WEB_PASSWORD` | – | Optionaler Login für die Web-UI (Basicauth) |
 
@@ -102,9 +121,7 @@ Alle Optionen (SMB/S3-Ziel, Zeitplan, Aufbewahrung, Parallelität, Ausschlüsse,
 > zurückgegeben. Ein gespeicherter Wert bleibt beim Speichern erhalten,
 > solange die Maske unverändert zurückgeschickt wird.
 
-## Nutzung
-
-### Web-UI
+## Web-UI
 
 Nach dem Start unter `http://<unraid-ip>:8080` (optional mit Login, wenn `WEB_PASSWORD` gesetzt ist):
 
@@ -116,24 +133,30 @@ Nach dem Start unter `http://<unraid-ip>:8080` (optional mit Login, wenn `WEB_PA
 
 > **Priorität:** Werte aus der Web-UI (settings.json) überschreiben die Umgebungsvariablen. Die Env-Vars dienen als Defaults beim ersten Start – der Container startet auch ohne Konfiguration, dann einfach alles über die UI eintragen.
 
-> **Robustheit:** Uploads laufen atomar (erst `<name>.tar.part`, dann Umbenennen) und werden optional per Größencheck verifiziert – halbfertige Uploads erscheinen nie als gültiges Backup. Beim Restore werden auch fehlende benutzerdefinierte Docker-Netzwerke anhand des Inspect-JSONs neu angelegt (inkl. Aliase).
-
-### CLI
+## CLI
 
 ```bash
-docker exec -it container-backup python -m app.cli status
-docker exec -it container-backup python -m app.cli list
-docker exec -it container-backup python -m app.cli backup --all
-docker exec -it container-backup python -m app.cli backup --container jellyfin
-docker exec -it container-backup python -m app.cli restore jellyfin            # neuestes Backup
-docker exec -it container-backup python -m app.cli restore jellyfin --overwrite # existierenden ersetzen
-docker exec -it container-backup python -m app.cli delete jellyfin jellyfin_20260901_030000.tar
+docker exec -it dockguard python -m app.cli status
+docker exec -it dockguard python -m app.cli list
+docker exec -it dockguard python -m app.cli backup --all
+docker exec -it dockguard python -m app.cli backup --container jellyfin
+docker exec -it dockguard python -m app.cli restore jellyfin            # neuestes Backup
+docker exec -it dockguard python -m app.cli restore jellyfin --overwrite # existierenden ersetzen
+docker exec -it dockguard python -m app.cli delete jellyfin jellyfin_20260901_030000.tar
+```
+
+## Entwicklung & Tests
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+python tests/test_smoke.py        # 57 Tests: Backend-Logik, Sicherheit, Restore
 ```
 
 ## Grenzen & Hinweise
 
 - Gesichert werden **Dateien der Mounts**, die Konfiguration und das Template. Das **Image** wird beim Restore bei Bedarf neu gezogen (nicht als Layer gesichert).
-- tmpfs-Mounts und Systempfade (`/etc`, `/dev`, …) werden übersprungen.
+- tmpfs-Mounts und Systempfade (`/etc`, `/dev`, …) werden übersprungen; weitere Mounts lassen sich über `EXCLUDE_MOUNTS` ausschließen.
 - GPU-Passthrough (DeviceRequests) wird übernommen, sofern der Treiber auf dem Host verfügbar ist.
 - Der Restore überschreibt vorhandene Daten an den Originalpfaden – deshalb gibt es in der UI eine Bestätigung.
-- Sicherheits-Hinweis: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host. Nur im vertrauenswürdigen LAN betreiben.
+- Sicherheits-Hinweis: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host. Nur im vertrauenswürdigen LAN betreiben (optional per `WEB_PASSWORD` absichern).

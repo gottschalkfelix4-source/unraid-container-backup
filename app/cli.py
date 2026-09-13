@@ -9,7 +9,7 @@ from .storage import Storage
 
 
 def main():
-    p = argparse.ArgumentParser(prog="container-backup", description="Unraid Container Backup")
+    p = argparse.ArgumentParser(prog="dockguard", description="DockGuard – Unraid Container Backup")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("status", help="Zeigt die Konfiguration und Erreichbarkeit des Ziels")

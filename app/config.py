@@ -88,7 +88,7 @@ class Config:
         self.staging_dir = _env("STAGING_DIR", "/staging")
         self.rclone_conf = _env("RCLONE_CONF", "/config/rclone.conf")
         self.rclone_timeout = _env("RCLONE_TIMEOUT", "7200")
-        self.exclude = _env("EXCLUDE_CONTAINERS", "container-backup")
+        self.exclude = _env("EXCLUDE_CONTAINERS", "dockguard,container-backup")
         self.exclude_mounts = _env("EXCLUDE_MOUNTS", "")
         self.parallel = _env("BACKUP_PARALLEL", "2")
         self.bwlimit = _env("RCLONE_BWLIMIT", "")

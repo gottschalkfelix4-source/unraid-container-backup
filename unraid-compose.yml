@@ -1,9 +1,9 @@
-# Beispiel-Compose für Unraid (Compose Manager) oder Docker-CLI.
+# DockGuard – Beispiel-Compose für Unraid (Compose Manager) oder Docker-CLI.
 # Für die GUI-Eintragung siehe README.md (Abschnitt "Installation").
 services:
-  container-backup:
-    image: unraid-container-backup:latest
-    container_name: container-backup
+  dockguard:
+    image: dockguard:latest
+    container_name: dockguard
     ports:
       - "8080:8080"
     volumes:
@@ -15,8 +15,8 @@ services:
       - /boot/config:/boot/config
       # Benannte Docker-Volumes
       - /var/lib/docker/volumes:/var/lib/docker/volumes
-      # rclone-Konfiguration (optional persistent)
-      - /mnt/user/appdata/container-backup:/config
+      # Einstellungen + rclone-Konfiguration (persistent)
+      - /mnt/user/appdata/dockguard:/config
     environment:
       # --- Ziel wählen: smb ODER s3 ---
       - BACKUP_TYPE=smb
@@ -39,7 +39,7 @@ services:
       - BACKUP_SCHEDULE=0 3 * * *   # täglich 03:00 UTC
       - BACKUP_KEEP=7               # 7 Backups pro Container behalten (0 = alle)
       - BACKUP_PARALLEL=2           # Container gleichzeitig sichern (1-16)
-      - EXCLUDE_CONTAINERS=container-backup
+      - EXCLUDE_CONTAINERS=dockguard
       # - EXCLUDE_MOUNTS=/cache, /transcode   # Mounts ausschließen (Quelle/Ziel enthält Ausdruck)
       # - RCLONE_BWLIMIT=8M          # Upload-Limit, leer = unbegrenzt
       # - VERIFY_UPLOAD=1            # Größencheck nach Upload (0 = aus)

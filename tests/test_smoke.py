@@ -311,7 +311,7 @@ cfgx.bwlimit = "8M"
 cfgx._parse()
 cfgx.validate()
 check("bwlimit gültig akzeptiert", True)
-check("exclude parsed", cfgx.exclude == ["container-backup"])
+check("exclude parsed", cfgx.exclude == ["dockguard", "container-backup"])
 cfgx.exclude_mounts = ["/cache", "plex/Library"]
 check("exclude_mounts parsed", cfgx.exclude_mounts == ["/cache", "plex/Library"])
 
