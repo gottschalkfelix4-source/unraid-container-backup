@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>container-backup</Name>
+  <Author>Felix Gottschalk</Author>
+  <Support>https://github.com/gottschalkfelix4-source/unraid-container-backup</Support>
+  <Overview>Docker-Container sicher auf einen anderen Server (SMB-Share oder S3) sichern und mit einem Klick wiederherstellen – inklusive Daten an den Originalpfaden, Unraid-Community-App-Template und exakter Container-Konfiguration (Image, Ports, Environment, Netzwerk, Labels). Nach einem kompletten Löschen stellt der Container sich selbst und die App wieder so her, als wäre nichts passiert.
+
+Sicherung: Jeder Container wird als einzelne .tar-Datei mit vollständigem docker inspect, allen Bind-Mounts/Volumes und dem Unraid-Template gesichert. Uploads laufen atomar (erst .part, dann Umbenennen) mit optionaler Größenverifizierung.
+
+Restore: Daten an die Originalpfade zurück, Template nach /boot/config/plugins/dockerMan/templates-user, Image wird bei Bedarf neu gezogen, Container exakt wie vorher neu angelegt und gestartet – auch auf einem frischen Server (fehlende Docker-Netzwerke werden automatisch rekonstruiert).
+
+Geplanter Lauf per Cron (UTC), Aufbewahrung (Retention), parallele Backups, Bandbreitenlimit und Mount-Ausschlüsse sind über die Web-UI konfigurierbar.
+
+ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host – nur im vertrauenswürdigen LAN betreiben. Image lokal bauen: ./build.sh (bzw. docker build -t unraid-container-backup:latest .)</Overview>
+  <Category>Backup:Utilities:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/icon.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/unraid-container-backup.xml</TemplateURL>
+  <Registry>https://github.com/gottschalkfelix4-source/unraid-container-backup</Registry>
+  <Repository>unraid-container-backup:latest</Repository>
+  <Privileged>false</Privileged>
+  <RequiresVariant>false</RequiresVariant>
+  <BlkioWeight>500</BlkioWeight>
+  <Nice>0</Nice>
+
+  <!-- ============ Ports ============ -->
+  <Config Name="Web-UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port der Weboberfläche" Type="Port" Display="always" Required="true" Mask="false"/>
+
+  <!-- ============ Pfade ============ -->
+  <Config Name="Config-Verzeichnis" Target="/config" Default="/mnt/user/appdata/container-backup" Mode="rw" Description="Einstellungen (settings.json) und rclone-Konfiguration" Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Docker-Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Docker-API – notwendig für Backup/Restore (erfordert Root-Zugriff)" Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="User-Daten (/mnt/user)" Target="/mnt/user" Default="/mnt/user" Mode="rw" Description="Container-Daten und Unraid-Shares – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Boot-Config (/boot/config)" Target="/boot/config" Default="/boot/config" Mode="rw" Description="Unraid-Templates aus plugins/dockerMan/templates-user – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Docker-Volumes (/var/lib/docker/volumes)" Target="/var/lib/docker/volumes" Default="/var/lib/docker/volumes" Mode="rw" Description="Benannte Volumes – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
+
+  <!-- ============ Ziel: SMB ODER S3 ============ -->
+  <Config Name="Backup-Typ" Target="BACKUP_TYPE" Default="smb" Description="Ziel waehlen: 'smb' (Share) oder 's3' (S3-kompatibel)" Type="Variable" Display="always" Required="true" Mask="false">
+    <Select>
+      <Option>smb</Option>
+      <Option>s3</Option>
+    </Select>
+  </Config>
+
+  <Config Name="SMB-Host" Target="SMB_HOST" Default="" Description="IP oder Hostname des SMB-Servers (bei Backup-Typ smb)" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="SMB-Port" Target="SMB_PORT" Default="445" Description="" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="SMB-Benutzer" Target="SMB_USER" Default="" Description="" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="SMB-Passwort" Target="SMB_PASS" Default="" Description="" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="SMB-Share" Target="SMB_SHARE" Default="" Description="Name des SMB-Shares" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="SMB-Unterverzeichnis" Target="SMB_PATH" Default="" Description="Optionaler Teilpfad im Share, z. B. unraid/backups" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="S3-Provider" Target="S3_PROVIDER" Default="AWS" Description="rclone-Provider (bei Backup-Typ s3)" Type="Variable" Display="advanced" Required="false" Mask="false">
+    <Select>
+      <Option>AWS</Option>
+      <Option>Minio</Option>
+      <Option>Garage</Option>
+      <Option>Ceph</Option>
+      <Option>DigitalOcean</Option>
+      <Option>Wasabi</Option>
+      <Option>Backblaze B2</Option>
+      <Option>Other</Option>
+    </Select>
+  </Config>
+  <Config Name="S3-Endpoint" Target="S3_ENDPOINT" Default="" Description="z. B. https://s3.meine-domain.de – bei AWS leer lassen" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="S3-Region" Target="S3_REGION" Default="us-east-1" Description="" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="S3-Bucket" Target="S3_BUCKET" Default="" Description="Bucket-Name" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="S3-Access-Key" Target="S3_ACCESS_KEY" Default="" Description="" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="S3-Secret-Key" Target="S3_SECRET_KEY" Default="" Description="" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="S3-Unterverzeichnis" Target="S3_PATH" Default="" Description="Optionaler Prefix im Bucket" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <!-- ============ Verhalten ============ -->
+  <Config Name="Zeitplan (Cron, UTC)" Target="BACKUP_SCHEDULE" Default="0 3 * * *" Description="z. B. '0 3 * * *' taeglich 03:00 · '0 */6 * * *' alle 6 h · '0 2 * * 0' sonntags 02:00" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Backups behalten" Target="BACKUP_KEEP" Default="7" Description="Backups pro Container behalten, 0 = alle" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Parallele Backups" Target="BACKUP_PARALLEL" Default="2" Description="Container gleichzeitig sichern (1-16)" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Ausgeschlossene Container" Target="EXCLUDE_CONTAINERS" Default="container-backup" Description="Kommagetrennte Namen, die nie gesichert werden" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Ausgeschlossene Mounts" Target="EXCLUDE_MOUNTS" Default="" Description="Mounts ueberspringen, deren Quelle oder Ziel einen Ausdruck enthaelt, z. B. '/cache, /transcode'" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Upload-Bandbreitenlimit" Target="RCLONE_BWLIMIT" Default="" Description="rclone-Syntax, z. B. 8M oder 500K – leer = unbegrenzt" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Upload-Verifizierung" Target="VERIFY_UPLOAD" Default="1" Description="Groessencheck nach dem Upload (1 = an, 0 = aus)" Type="Variable" Display="advanced" Required="false" Mask="false">
+    <Select>
+      <Option>1</Option>
+      <Option>0</Option>
+    </Select>
+  </Config>
+  <Config Name="rclone-Timeout (Sekunden)" Target="RCLONE_TIMEOUT" Default="7200" Description="Maximale Dauer eines rclone-Befehls" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Template-Verzeichnis(e)" Target="TEMPLATES_DIR" Default="/boot/config/plugins/dockerMan/templates-user" Description="Kommagetrennt; Restore schreibt ins erste" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Staging-Verzeichnis" Target="STAGING_DIR" Default="/staging" Description="Temporaere Ablage waehrend Backup/Restore" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Anzeigename (Web-UI-Login)" Target="WEB_USER" Default="admin" Description="Optionaler Login-Benutzername (nur mit WEB_PASSWORD aktiv)" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Web-UI-Passwort" Target="WEB_PASSWORD" Default="" Description="Optionaler Login-Schutz fuer die Weboberflaeche; leer = kein Login" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+
+  <Config Name="Zeitzone" Target="TZ" Default="Europe/Berlin" Description="" Type="Variable" Display="always" Required="false" Mask="false"/>
+</Container>

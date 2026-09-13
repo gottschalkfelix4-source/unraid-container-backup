@@ -1,4 +1,5 @@
 """Smoke-Test: Backup/Restore-Logik mit simulierten Docker- und Storage-Objekten."""
+import datetime as dt
 import json
 import os
 import shutil
@@ -285,6 +286,140 @@ backup_mod._apply_retention(storage, "jellyfin", cfg.keep, lambda m: None)
 remaining = storage.list_backups("jellyfin")
 check("Retention hält 3 Backups", len(remaining) == 3)
 check("Älteste gelöscht", not any(b["id"].startswith("jellyfin_20260101") or b["id"].startswith("jellyfin_20260102") for b in remaining))
+
+# ---------- 8. Neues: Secret-Masking, bwlimit, exclude_mounts ----------
+print("== Neue Config-Funktionen ==")
+os.environ.update({"BACKUP_TYPE": "smb", "SMB_HOST": "h", "SMB_USER": "u",
+                   "SMB_PASS": "p", "SMB_SHARE": "s"})
+cfgx = Config()
+cfgx.validate()
+check("Passwort maskiert in to_dict", cfgx.to_dict()["smb_pass"] == "********")
+check("Intern bleibt Passwort erhalten", cfgx.smb_pass == "p")
+cfgx.update({"smb_pass": "********", "backup_type": "smb"})
+check("Maske beim Speichern erhält Wert", cfgx.smb_pass == "p")
+cfgx.update({"smb_pass": ""})
+check("Leeren String löscht Passwort", cfgx.smb_pass == "")
+cfgx.smb_pass = "p"
+try:
+    cfgx.bwlimit = "100GBG"
+    cfgx._parse()
+    cfgx.validate()
+    check("bwlimit ungültig abgelehnt", False)
+except ValueError:
+    check("bwlimit ungültig abgelehnt", True)
+cfgx.bwlimit = "8M"
+cfgx._parse()
+cfgx.validate()
+check("bwlimit gültig akzeptiert", True)
+check("exclude parsed", cfgx.exclude == ["container-backup"])
+cfgx.exclude_mounts = ["/cache", "plex/Library"]
+check("exclude_mounts parsed", cfgx.exclude_mounts == ["/cache", "plex/Library"])
+
+print("== exclude_mounts beim Backup ==")
+ins2 = json.loads(json.dumps(INSPECT))
+cache_dir = os.path.join(root, "appdata_cache")
+os.makedirs(cache_dir)
+with open(os.path.join(cache_dir, "cache.bin"), "wb") as f:
+    f.write(b"c" * 512)
+ins2["Mounts"].append({"Type": "bind", "Source": cache_dir, "Destination": "/config/cache", "RW": True})
+cfg.exclude_mounts = ["/config/cache"]
+client8 = FakeClient(ins2)
+client8.api.live = {"jellyfin"}
+res2 = backup_mod.backup_container(client8, cfg, storage, "jellyfin", log=lambda m: None)
+check("exclude_mounts übersprungen", len(res2["mounts"]) == 1 and res2["mounts"][0]["source"] == data_root)
+cfg.exclude_mounts = []
+
+
+# ---------- 9. Neues: sicheres Entpacken (Traversal-Schutz) ----------
+print("== Safe-Extract ==")
+import io as _io
+evil = os.path.join(root, "evil.tar")
+with tarfile.open(evil, "w") as tf:
+    entries = {
+        "meta.json": b'{"container": "x"}',
+        "volumes/ok.tar.gz": b"DATA",
+        "../evil.txt": b"BOOM",
+        "README.md": b"FREMDE",
+        "/abs/pwned": b"NOPE",
+    }
+    for name, data in entries.items():
+        ti = tarfile.TarInfo(name)
+        ti.size = len(data)
+        with _io.BytesIO(data) as bio:
+            tf.addfile(ti, bio)
+extract_dir = os.path.join(root, "extract_dir")
+os.makedirs(extract_dir, exist_ok=True)
+with tarfile.open(evil, "r") as tf:
+    restore_mod._safe_extract(tf, extract_dir, lambda m: None)
+check("Erlaubte Dateien extrahiert",
+      os.path.isfile(os.path.join(extract_dir, "meta.json"))
+      and os.path.isfile(os.path.join(extract_dir, "volumes", "ok.tar.gz")))
+check("Traversal blockiert (../evil.txt)", not os.path.exists(os.path.join(root, "evil.txt")))
+check("Absoluter Pfad blockiert", not os.path.exists("/abs/pwned"))
+check("Fremde Elemente übersprungen", not os.path.exists(os.path.join(extract_dir, "README.md")))
+
+
+# ---------- 10. Neues: Restore mit benutzerdefiniertem Netzwerk ----------
+print("== Restore mit Custom-Netzwerk ==")
+
+
+class FakeApiNet(FakeApi):
+    def __init__(self, ins):
+        super().__init__(ins)
+        self.networks = {}
+        self.created_net = None
+        self.connected = []
+
+    def inspect_network(self, name):
+        if name not in self.networks:
+            from docker.errors import NotFound
+            raise NotFound(f"network {name} not found")
+        return {"Name": name, "Id": "net-" + name}
+
+    def create_network(self, **kw):
+        self.created_net = kw
+        self.networks[kw["name"]] = kw
+        return {"Id": "net123", "Name": kw["name"]}
+
+    def connect_container_to_network(self, cid, net, aliases=None):
+        self.connected.append((cid, net, aliases))
+
+
+class FakeClientNet(FakeClient):
+    def __init__(self, ins):
+        self.api = FakeApiNet(ins)
+
+
+ins3 = json.loads(json.dumps(INSPECT))
+ins3["Name"] = "/mynet-app"
+ins3["Config"]["Image"] = "nginxdemos/hello:latest"
+ins3["NetworkSettings"]["Networks"] = {
+    "mynet": {"Aliases": ["app1"], "Driver": "bridge",
+              "Options": {"com.docker.network.bridge.enable_icc": "true"}},
+}
+client3 = FakeClientNet(ins3)
+client3.api.live = {"mynet-app"}
+st3 = LocalStorage(os.path.join(root, "remote3"))
+backup_mod.backup_container(client3, cfg, st3, "mynet-app", log=lambda m: None)
+client3.api.live = set()
+res3 = restore_mod.restore(st3, cfg, client3, "mynet-app", log=lambda m: None)
+check("Custom-Network recreated", (client3.api.created_net or {}).get("name") == "mynet")
+check("Network-Alias übergeben",
+      any(net == "mynet" and aliases == ["app1"] for _, net, aliases in client3.api.connected))
+check("Container verbunden", len(client3.api.connected) == 1)
+
+
+# ---------- 11. Neues: Backup-Zeitstempel (Backend) ----------
+print("== Zeitstempel-Parsing ==")
+from app.main import _backup_epoch
+
+expected = dt.datetime(2026, 9, 13, 3, 0, 0, tzinfo=dt.timezone.utc).timestamp()
+check("Epoch aus Backup-ID",
+      _backup_epoch({"id": "jellyfin_20260913_030000.tar", "mtime": ""}) == expected)
+expected2 = dt.datetime(2026, 9, 13, 5, 0, 0, tzinfo=dt.timezone.utc).timestamp()
+check("mtime bevorzugt",
+      _backup_epoch({"id": "jellyfin_20260913_030000.tar", "mtime": "2026-09-13T05:00:00Z"}) == expected2)
+check("Unparsbar -> 0", _backup_epoch({"id": "jellyfin_broken", "mtime": ""}) == 0)
 
 # ---------- Zusammenfassung ----------
 failed = [n for n, ok in PASS if not ok]

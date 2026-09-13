@@ -38,6 +38,12 @@ services:
       # --- Verhalten ---
       - BACKUP_SCHEDULE=0 3 * * *   # täglich 03:00 UTC
       - BACKUP_KEEP=7               # 7 Backups pro Container behalten (0 = alle)
-      - WEB_PORT=8080
+      - BACKUP_PARALLEL=2           # Container gleichzeitig sichern (1-16)
       - EXCLUDE_CONTAINERS=container-backup
+      # - EXCLUDE_MOUNTS=/cache, /transcode   # Mounts ausschließen (Quelle/Ziel enthält Ausdruck)
+      # - RCLONE_BWLIMIT=8M          # Upload-Limit, leer = unbegrenzt
+      # - VERIFY_UPLOAD=1            # Größencheck nach Upload (0 = aus)
+      # --- Sicherheit (optional) ---
+      # - WEB_USER=admin
+      # - WEB_PASSWORD=meinpasswort
     restart: unless-stopped

@@ -1,11 +1,12 @@
+"""Docker-Operationen: Inspection, Template-Suche, Image-Pull, Recreate."""
 import os
 import xml.etree.ElementTree as ET
 
 import docker
-from docker.errors import ImageNotFound
+from docker.errors import ImageNotFound, NotFound
 
 # Felder aus dem Inspect-HostConfig, die die Create-API nicht akzeptiert
-SKIP_HOST_CONFIG_KEYS = {"Mounts", "ConsoleSize"}
+SKIP_HOST_CONFIG_KEYS = {"Mounts", "Binds", "ConsoleSize"}
 
 
 def get_client(docker_host):
@@ -15,12 +16,13 @@ def get_client(docker_host):
 def find_template(templates_dir, container_name):
     """Findet das Unraid-Template (XML) zu einem Container-Namen.
 
-    templates_dir: Pfad oder Liste von Pfaden."""
+    templates_dir: Pfad oder Liste von Pfaden.
+    """
     dirs = templates_dir if isinstance(templates_dir, (list, tuple)) else [templates_dir]
-    for templates_dir in dirs:
-        if not os.path.isdir(templates_dir):
+    for tdir in dirs:
+        if not os.path.isdir(tdir):
             continue
-        found = _find_in_dir(templates_dir, container_name)
+        found = _find_in_dir(tdir, container_name)
         if found:
             return found
     return None
@@ -48,11 +50,11 @@ def _find_in_dir(templates_dir, container_name):
 def ensure_image(api, image_ref, log=print):
     """Stellt sicher, dass das Image lokal vorhanden ist (sonst Pull)."""
     if not image_ref:
-        return
+        return False
     try:
         api.inspect_image(image_ref)
         log(f"Image '{image_ref}' ist lokal vorhanden")
-        return
+        return False
     except ImageNotFound:
         pass
     log(f"Ziehe Image '{image_ref}' ...")
@@ -60,6 +62,43 @@ def ensure_image(api, image_ref, log=print):
         status = chunk.get("status") or chunk.get("error")
         if status:
             log(f"  {status}")
+    return True
+
+
+def ensure_network(api, name, inspect_dict):
+    """Stellt sicher, dass ein benutzerdefiniertes Netzwerk existiert.
+
+    Fehlt es (z. B. auf einem frischen Server), wird es anhand der Daten aus
+    dem Inspect-JSON neu angelegt (Treiber, Optionen, Labels).
+    """
+    if name in ("bridge", "host", "none", "default"):
+        return None
+    try:
+        return api.inspect_network(name)
+    except NotFound:
+        pass
+    nets = ((inspect_dict.get("NetworkSettings") or {}).get("Networks") or {})
+    info = nets.get(name) or {}
+    attrs = {"name": name, "driver": info.get("Driver") or "bridge"}
+    if info.get("Options"):
+        attrs["options"] = info["Options"]
+    if info.get("Labels"):
+        attrs["labels"] = info["Labels"]
+    return api.create_network(**attrs)
+
+
+def _container_networks(ins):
+    """Alle Netzwerknamen, denen der Container angehört (inspect-basiert)."""
+    settings = ((ins.get("NetworkSettings") or {}).get("Networks") or {})
+    configured = ((ins.get("NetworkingConfig") or {}).get("Networks") or {})
+    names = list(settings) or list(configured)
+    seen = set()
+    out = []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
 
 
 def recreate_container(api, name, ins, log=print):
@@ -71,7 +110,6 @@ def recreate_container(api, name, ins, log=print):
         for k, v in hc_src.items()
         if k not in SKIP_HOST_CONFIG_KEYS and v not in (None, "", [], {})
     }
-    nsc = ins.get("NetworkingConfig") or {}
 
     # Mounts als API-Dicts in den HostConfig (Schema: Target/Source/Type/...)
     mounts_api = []
@@ -110,7 +148,16 @@ def recreate_container(api, name, ins, log=print):
             ]
     hc["PortBindings"] = port_bindings
 
-    endpoints = {net: {} for net in (nsc.get("Networks") or {})}
+    settings_nets = ((ins.get("NetworkSettings") or {}).get("Networks") or {})
+    net_aliases = {}
+    for net_name, nw in settings_nets.items():
+        if net_name in ("bridge", "host", "none"):
+            continue
+        aliases = nw.get("Aliases") or []
+        if aliases:
+            net_aliases[net_name] = aliases
+
+    endpoints = {net: {} for net in _container_networks(ins)}
     networking_config = {"EndpointsConfig": endpoints} if endpoints else None
 
     container = api.create_container(
@@ -141,8 +188,14 @@ def recreate_container(api, name, ins, log=print):
         for net_name in endpoints:
             if net_name in ("bridge", "host", "none"):
                 continue
-            api.connect_container_to_network(container_id, net_name)
-            log(f"Mit Netzwerk '{net_name}' verbunden")
+            ensure_network(api, net_name, ins)
+            api.connect_container_to_network(
+                container_id, net_name, aliases=net_aliases.get(net_name) or None
+            )
+            if net_name in net_aliases:
+                log(f"Mit Netzwerk '{net_name}' verbunden (Aliase: {', '.join(net_aliases[net_name])})")
+            else:
+                log(f"Mit Netzwerk '{net_name}' verbunden")
 
     api.start(container_id)
     return container

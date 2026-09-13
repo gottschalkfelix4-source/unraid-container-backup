@@ -4,391 +4,1488 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Unraid Container Backup</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="%2338bdf8"/><path d="M16 6l8 4v6.5c0 4.8-3.4 7.4-7.6 8.9a1.2 1.2 0 0 1-.8 0C11.4 23.9 8 21.3 8 16.5V10z" fill="white" opacity=".95"/><path d="M11.5 16l3.2 3.2 5.8-5.8" stroke="%2338bdf8" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'>
 <style>
+  /* ============ Design-Tokens ============ */
   :root {
-    --bg: #0f1419; --panel: #1a2129; --panel2: #212a35; --border: #2d3844;
-    --text: #e6edf3; --muted: #8b98a5; --accent: #4da3ff; --green: #3fb950;
-    --red: #f85149; --yellow: #d29922;
+    --bg: #080c12;
+    --bg-grad-1: rgba(56, 189, 248, .07);
+    --bg-grad-2: rgba(168, 85, 247, .05);
+    --panel: #101722;
+    --panel-2: #151f2d;
+    --panel-3: #1b2738;
+    --border: #1d2939;
+    --border-2: #2b3b52;
+    --text: #e6eef7;
+    --text-2: #a9bccd;
+    --muted: #6d8299;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --accent-grad: linear-gradient(135deg, #38bdf8, #6366f1);
+    --accent-dim: rgba(56, 189, 248, .12);
+    --green: #34d399;
+    --green-dim: rgba(52, 211, 153, .12);
+    --yellow: #fbbf24;
+    --yellow-dim: rgba(251, 191, 36, .12);
+    --red: #f87171;
+    --red-dim: rgba(248, 113, 113, .12);
+    --purple: #a78bfa;
+    --radius: 14px;
+    --radius-sm: 9px;
+    --shadow: 0 12px 34px rgba(0, 0, 0, .4);
+    --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
+    --font: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, "Segoe UI", Roboto, sans-serif; padding: 24px; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-  .statusbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-  .pill { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; color: var(--muted); }
-  .pill b { color: var(--text); font-weight: 600; }
-  .pill.ok b { color: var(--green); }
-  .pill.err b { color: var(--red); }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
-  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
-  .card-head h2 { font-size: 15px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 10px 18px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  td { padding: 10px 18px; border-bottom: 1px solid var(--border); }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--panel2); }
-  .state { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
-  .state.running { background: var(--green); }
-  .state.exited, .state.dead { background: var(--red); }
-  .state.paused { background: var(--yellow); }
-  button { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 500; }
-  button:hover { filter: brightness(1.1); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  button.secondary { background: var(--panel2); border: 1px solid var(--border); }
-  button.danger { background: var(--red); }
-  .empty { padding: 24px 18px; color: var(--muted); font-size: 13px; }
-  .jobs { max-height: 260px; overflow-y: auto; }
-  .job { padding: 12px 18px; border-bottom: 1px solid var(--border); }
-  .job:last-child { border-bottom: none; }
-  .job-title { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
-  .job-status { font-size: 12px; }
-  .job-status.running { color: var(--yellow); }
-  .job-status.done { color: var(--green); }
-  .job-status.error { color: var(--red); }
-  .job-log { background: #0d1117; border-radius: 6px; padding: 10px; font-family: ui-monospace, monospace; font-size: 11px; color: #9fb0c0; max-height: 140px; overflow-y: auto; white-space: pre-wrap; margin-top: 6px; }
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; }
-  .modal-bg.open { display: flex; }
-  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 440px; max-width: 92vw; }
-  .modal h3 { font-size: 16px; margin-bottom: 12px; }
-  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
-  .modal .warn { color: var(--yellow); }
-  .modal label { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 12px 0; cursor: pointer; }
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
-  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 12px 18px; font-size: 13px; z-index: 20; display: none; max-width: 420px; }
-  .toast.err { border-left-color: var(--red); }
-  .toast.show { display: block; }
-  code { background: #0d1117; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
-  /* Einstellungen */
-  .settings-body { padding: 18px; }
-  .field-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
-  .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 12px; color: var(--muted); }
-  .field label .req { color: var(--red); }
-  .field input, .field select { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 13px; width: 100%; }
-  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
-  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
-  .section-title:first-child { margin-top: 0; }
-  .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
-  .hidden { display: none !important; }
-  .settings-actions { display: flex; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
-  .settings-msg { font-size: 13px; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 500px at 85% -10%, var(--bg-grad-1), transparent 60%),
+      radial-gradient(800px 500px at -10% 110%, var(--bg-grad-2), transparent 60%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #243244; border-radius: 8px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: #2f4257; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  a { color: var(--accent); text-decoration: none; }
+  code, .mono { font-family: var(--mono); font-size: .92em; }
+
+  /* ============ Layout ============ */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar {
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column;
+    background: rgba(12, 18, 28, .82);
+    backdrop-filter: blur(14px);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 20px; }
+  .brand-logo {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    background: var(--accent-grad);
+    display: grid; place-items: center; color: #fff;
+    box-shadow: 0 6px 18px rgba(56, 189, 248, .35);
+  }
+  .brand b { font-size: 14.5px; line-height: 1.2; display: block; }
+  .brand span { font-size: 11px; color: var(--muted); }
+  nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px; border-radius: 10px; border: 1px solid transparent;
+    color: var(--text-2); font-size: 13.5px; font-weight: 500;
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+    background: none; text-align: left; width: 100%;
+  }
+  .nav-item:hover { background: var(--panel-2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(56,189,248,.25); }
+  .nav-item .badge { margin-left: auto; }
+  .sidebar-foot { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
+  .foot-pill { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); font-size: 12px; color: var(--muted); }
+  .foot-pill b { color: var(--text); font-weight: 600; }
+  .foot-pill .dot.warn { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .foot-version { font-size: 10.5px; color: var(--muted); padding: 8px 10px 0; }
+
+  .main { padding: 26px 30px 60px; max-width: 1280px; width: 100%; margin: 0 auto; }
+  .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  .topbar .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .top-actions { display: flex; gap: 8px; }
+
+  .page { animation: pageIn .22s ease; }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ============ Buttons & Badges ============ */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid transparent; border-radius: 9px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: filter .15s, transform .05s, background .15s, border-color .15s;
+    font-family: inherit; white-space: nowrap;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn.primary { background: var(--accent-grad); color: #fff; box-shadow: 0 4px 14px rgba(56,189,248,.28); }
+  .btn.primary:not(:disabled):hover { filter: brightness(1.12); }
+  .btn.secondary { background: var(--panel-2); border-color: var(--border-2); color: var(--text); }
+  .btn.secondary:not(:disabled):hover { background: var(--panel-3); }
+  .btn.danger { background: var(--red-dim); border-color: rgba(248,113,113,.35); color: var(--red); }
+  .btn.danger:not(:disabled):hover { background: rgba(248,113,113,.2); }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+  .btn.ghost:not(:disabled):hover { background: var(--panel-2); color: var(--text); }
+  .btn.icon { padding: 8px; border-radius: 9px; }
+  .btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
+  .btn .icon, .icon { width: 16px; height: 16px; flex: none; }
+  .btn.icon-lge .icon { width: 18px; height: 18px; }
+  .btn.loading { position: relative; color: transparent !important; pointer-events: none; }
+  .btn.loading::after {
+    content: ""; position: absolute; inset: 0; margin: auto;
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--border-2); color: var(--text-2); background: var(--panel-2);
+  }
+  .badge.green { color: var(--green); background: var(--green-dim); border-color: rgba(52,211,153,.3); }
+  .badge.yellow { color: var(--yellow); background: var(--yellow-dim); border-color: rgba(251,191,36,.3); }
+  .badge.red { color: var(--red); background: var(--red-dim); border-color: rgba(248,113,113,.3); }
+  .badge.blue { color: var(--accent); background: var(--accent-dim); border-color: rgba(56,189,248,.3); }
+  .badge.gray { color: var(--muted); background: var(--panel-2); border-color: var(--border); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.green .dot { background: var(--green); }
+  .badge.yellow .dot { background: var(--yellow); }
+  .badge.red .dot { background: var(--red); }
+  .badge.blue .dot { background: var(--accent); }
+  .badge.gray .dot { background: var(--muted); }
+
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none;
+    background: var(--muted);
+  }
+  .dot.run { background: var(--green); box-shadow: 0 0 0 0 rgba(52,211,153,.5); animation: pulse 2s infinite; }
+  .dot.warn { background: var(--yellow); }
+  .dot.stop { background: #556176; }
+  .dot.err { background: var(--red); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52,211,153,.45); }
+    70% { box-shadow: 0 0 0 7px rgba(52,211,153,0); }
+    100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+  }
+
+  /* ============ Cards & Grids ============ */
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 18px;
+  }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 15px 18px; border-bottom: 1px solid var(--border);
+  }
+  .card-head h2 { font-size: 15px; font-weight: 650; display: flex; align-items: center; gap: 9px; }
+  .card-head h2 .icon { color: var(--accent); }
+  .card-body { padding: 18px; }
+  .muted { color: var(--muted); }
+  .center { text-align: center; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; position: relative; overflow: hidden;
+    transition: border-color .15s, transform .15s;
+  }
+  .stat-card:hover { border-color: var(--border-2); transform: translateY(-2px); }
+  .stat-card .stat-icon {
+    position: absolute; right: -8px; top: -8px; width: 64px; height: 64px; opacity: .07;
+  }
+  .stat-card .stat-icon .icon { width: 64px; height: 64px; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .stat-val { font-size: 27px; font-weight: 750; letter-spacing: -.02em; margin: 7px 0 2px; }
+  .stat-sub { font-size: 12px; color: var(--muted); }
+  .stat-sub .inline-dot { margin-right: 5px; vertical-align: 1px; }
+
+  /* ============ Container-Karten ============ */
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
+  .search-wrap .icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 15px; height: 15px; pointer-events: none; }
+  .search-wrap input { width: 100%; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    border: 1px solid var(--border-2); background: var(--panel-2); color: var(--text-2);
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .chip:hover { color: var(--text); }
+  .chip.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(56,189,248,.35); }
+  .chip .count { font-size: 11px; opacity: .75; }
+
+  .c-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .c-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 15px 16px; display: flex; flex-direction: column; gap: 12px;
+    transition: border-color .15s, transform .15s, box-shadow .15s;
+  }
+  .c-card:hover { border-color: var(--border-2); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .c-head { display: flex; align-items: flex-start; gap: 10px; }
+  .c-head .dot { margin-top: 5px; }
+  .c-title { flex: 1; min-width: 0; }
+  .c-title b { font-size: 14.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c-image { font-size: 11.5px; color: var(--muted); font-family: var(--mono); display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c-meta { display: flex; gap: 14px; flex-wrap: wrap; border-top: 1px dashed var(--border); padding-top: 10px; }
+  .c-meta-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+  .c-meta-item .icon { width: 13px; height: 13px; }
+  .c-meta-item b { color: var(--text-2); font-weight: 600; }
+  .c-actions { display: flex; gap: 8px; }
+  .c-actions .btn { flex: 1; justify-content: center; }
+
+  /* ============ Backups ============ */
+  .b-group { margin-bottom: 12px; }
+  .b-group-head {
+    width: 100%; display: flex; align-items: center; gap: 11px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 15px; cursor: pointer;
+    font-family: inherit; font-size: 13.5px; color: var(--text);
+    transition: border-color .15s, background .15s;
+  }
+  .b-group-head:hover { border-color: var(--border-2); background: var(--panel-3); }
+  .b-group-head .g-count { margin-left: auto; font-size: 11.5px; color: var(--muted); font-weight: 600; margin-right: 6px; }
+  .b-group-head .chev { transition: transform .18s; color: var(--muted); }
+  .b-group.open .b-group-head .chev { transform: rotate(180deg); }
+  .b-group-body { display: none; }
+  .b-group.open .b-group-body { display: block; margin-top: 8px; animation: pageIn .18s ease; }
+  table.data { width: 100%; border-collapse: collapse; }
+  table.data th {
+    text-align: left; padding: 9px 14px; color: var(--muted); font-size: 11px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .07em;
+    border-bottom: 1px solid var(--border);
+  }
+  table.data td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  table.data tr:last-child td { border-bottom: none; }
+  table.data tbody tr { transition: background .1s; }
+  table.data tbody tr:hover { background: rgba(27, 39, 56, .5); }
+  table.data td .bk-id { font-family: var(--mono); font-size: 12px; color: var(--text-2); word-break: break-all; }
+  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border-2); background: var(--panel-2); color: var(--text-2);
+    border-radius: 8px; padding: 5px 9px; font-size: 11.5px; font-weight: 600;
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--panel-3); }
+  .icon-btn.danger:hover { color: var(--red); border-color: rgba(248,113,113,.4); background: var(--red-dim); }
+  .icon-btn .icon { width: 13px; height: 13px; }
+
+  /* ============ Empty / Loading ============ */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 44px 20px; color: var(--muted); text-align: center;
+    border: 1.5px dashed var(--border-2); border-radius: var(--radius); background: var(--panel);
+  }
+  .empty-state .icon { width: 34px; height: 34px; opacity: .4; }
+  .empty-state b { color: var(--text-2); font-size: 14px; }
+  .empty-state p { font-size: 12.5px; max-width: 380px; line-height: 1.5; }
+  .skeleton { position: relative; overflow: hidden; background: var(--panel-2); border-radius: 8px; color: transparent !important; }
+  .skeleton::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+  /* ============ Aufgaben / Jobs ============ */
+  .jobs-list { display: flex; flex-direction: column; gap: 10px; max-height: 640px; overflow-y: auto; padding-right: 4px; }
+  .job-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    overflow: hidden; transition: border-color .15s;
+  }
+  .job-card.running { border-color: rgba(56,189,248,.35); }
+  .job-card.error { border-color: rgba(248,113,113,.3); }
+  .job-head { display: flex; align-items: center; gap: 12px; padding: 12px 15px; cursor: pointer; }
+  .job-icon {
+    width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none;
+    background: var(--panel-3); color: var(--text-2);
+  }
+  .job-icon .icon { width: 15px; height: 15px; }
+  .job-icon.backup { color: var(--accent); background: var(--accent-dim); }
+  .job-icon.restore { color: var(--yellow); background: var(--yellow-dim); }
+  .job-icon.scheduled { color: var(--purple); background: rgba(167,139,250,.13); }
+  .job-main { flex: 1; min-width: 0; }
+  .job-main b { font-size: 13px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job-main .job-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .job-badge { flex: none; }
+  .job-chev { color: var(--muted); transition: transform .18s; }
+  .job-card.open .job-chev { transform: rotate(180deg); }
+  .job-body { display: none; }
+  .job-card.open .job-body { display: block; animation: pageIn .15s ease; }
+  .job-log {
+    background: #0a0f16; border-top: 1px solid var(--border); margin: 0;
+    padding: 13px 15px; font-family: var(--mono); font-size: 11.5px; line-height: 1.65;
+    color: #9ab3c9; max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+  }
+  .job-error {
+    background: var(--red-dim); border-top: 1px solid rgba(248,113,113,.25);
+    padding: 10px 15px; font-size: 12.5px; color: var(--red); font-family: var(--mono);
+  }
+  .jobs-foot { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+
+  /* ============ Einstellungen ============ */
+  .settings-nav { display: flex; gap: 6px; border-bottom: 1px solid var(--border); padding: 0 18px; overflow-x: auto; }
+  .settings-nav button {
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    padding: 13px 14px; font-size: 13px; font-weight: 600; color: var(--muted);
+    border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  .settings-nav button:hover { color: var(--text); }
+  .settings-nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .settings-page { padding: 22px 18px 8px; }
+  .settings-page.hidden { display: none; }
+  .section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 700; margin: 4px 0 14px; display: flex; align-items: center; gap: 8px; }
+  .section-title .icon { width: 14px; height: 14px; }
+  .form-row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .form-row > label { width: 230px; flex: none; padding-top: 9px; }
+  .form-row > label b { font-size: 13px; font-weight: 600; display: block; }
+  .form-row > label .req { color: var(--red); }
+  .form-row > label small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; font-weight: 400; }
+  .form-row .ctrl { flex: 1; min-width: 0; }
+  .form-row .ctrl input[type=text], .form-row .ctrl input[type=number], .form-row .ctrl input[type=password], .form-row .ctrl select {
+    width: 100%; max-width: 520px;
+  }
+  .form-row .ctrl .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  input[type=text], input[type=number], input[type=password], select {
+    background: #0b1118; border: 1px solid var(--border-2); border-radius: 9px;
+    color: var(--text); padding: 9px 12px; font-size: 13px; font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder { color: #42536a; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56,189,248,.15); }
+  .pw-wrap { position: relative; max-width: 520px; }
+  .pw-wrap input { padding-right: 38px; width: 100%; }
+  .pw-toggle {
+    position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    padding: 6px; display: grid; place-items: center; border-radius: 6px;
+  }
+  .pw-toggle:hover { color: var(--text); }
+  .pw-toggle .icon { width: 15px; height: 15px; }
+  .pw-toggle.off .icon-eye { display: none; }
+  .pw-toggle:not(.off) .icon-eye-off { display: none; }
+
+  .type-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; max-width: 560px; }
+  .tile {
+    display: flex; flex-direction: column; gap: 6px; padding: 16px;
+    border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+    background: var(--panel-2); cursor: pointer; transition: border-color .15s, background .15s;
+    font-family: inherit;
+  }
+  .tile .icon { width: 20px; height: 20px; color: var(--muted); }
+  .tile b { font-size: 13.5px; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
+  .tile span { font-size: 11.5px; color: var(--muted); }
+  .tile .check { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-2); display: grid; place-items: center; color: #fff; }
+  .tile .check .icon { width: 10px; height: 10px; color: #fff; display: none; }
+  .tile:hover { border-color: var(--accent); }
+  .tile.sel { border-color: var(--accent); background: var(--accent-dim); }
+  .tile.sel .icon { color: var(--accent); }
+  .tile.sel .check { border-color: var(--accent); background: var(--accent); }
+  .tile.sel .check .icon { display: block; }
+
+  .range-row { display: flex; align-items: center; gap: 14px; max-width: 520px; }
+  .range-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .range-row output { font-weight: 700; color: var(--accent); min-width: 24px; text-align: right; font-size: 14px; }
+  .switch { position: relative; display: inline-flex; width: 42px; height: 24px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider {
+    position: absolute; inset: 0; border-radius: 999px; cursor: pointer;
+    background: var(--panel-3); border: 1px solid var(--border-2); transition: background .2s;
+  }
+  .switch .slider::before {
+    content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    left: 3px; top: 3px; background: var(--muted); transition: transform .2s, background .2s;
+  }
+  .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(18px); background: #fff; }
+  .toggle-row { display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 4px 0; }
+  .toggle-row b { font-size: 13px; font-weight: 600; display: block; }
+  .toggle-row small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .preset-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .cron-preset {
+    font-size: 11px; padding: 4px 10px; border-radius: 999px; font-family: var(--mono);
+    border: 1px solid var(--border-2); background: var(--panel-2); color: var(--text-2); cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .cron-preset:hover, .cron-preset.active { background: var(--accent-dim); border-color: rgba(56,189,248,.4); color: var(--accent); }
+
+  .settings-actions {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px;
+    padding: 18px 0 0; border-top: 1px solid var(--border);
+  }
+  .settings-msg { font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  .settings-msg .icon { width: 14px; height: 14px; }
   .settings-msg.ok { color: var(--green); }
   .settings-msg.err { color: var(--red); }
+  .remote-preview {
+    background: #0b1118; border: 1px dashed var(--border-2); border-radius: 9px;
+    padding: 10px 13px; font-family: var(--mono); font-size: 12px; color: var(--text-2);
+    max-width: 560px; overflow-x: auto; word-break: break-all;
+  }
+
+  /* ============ Modal & Toast ============ */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(4, 8, 14, .72); backdrop-filter: blur(5px);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity .18s;
+  }
+  .modal-bg.open { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border-2); border-radius: 16px;
+    width: 480px; max-width: 100%; max-height: 88vh; overflow-y: auto;
+    box-shadow: var(--shadow); transform: translateY(10px) scale(.98);
+    transition: transform .18s;
+  }
+  .modal-bg.open .modal { transform: none; }
+  .modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 0; }
+  .modal-head .modal-icon {
+    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none;
+  }
+  .modal-head .modal-icon .icon { width: 18px; height: 18px; }
+  .modal-head .modal-icon.warn { background: var(--yellow-dim); color: var(--yellow); }
+  .modal-head .modal-icon.info { background: var(--accent-dim); color: var(--accent); }
+  .modal-head .modal-icon.danger { background: var(--red-dim); color: var(--red); }
+  .modal-head h3 { font-size: 15.5px; flex: 1; }
+  .modal-close {
+    background: none; border: none; color: var(--muted); cursor: pointer; padding: 6px;
+    border-radius: 8px; display: grid; place-items: center;
+  }
+  .modal-close:hover { background: var(--panel-3); color: var(--text); }
+  .modal-close .icon { width: 16px; height: 16px; }
+  .modal-body { padding: 16px 20px 6px; font-size: 13px; line-height: 1.55; color: var(--text-2); }
+  .modal-body .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12.5px; margin-bottom: 10px; }
+  .modal-body .kv dt { color: var(--muted); font-weight: 600; }
+  .modal-body .kv dd { color: var(--text-2); font-family: var(--mono); word-break: break-all; }
+  .modal-body .warn-box {
+    border: 1px solid rgba(251,191,36,.35); background: var(--yellow-dim); color: var(--yellow);
+    border-radius: 9px; padding: 10px 13px; font-size: 12px; line-height: 1.5; margin: 12px 0;
+    display: flex; gap: 9px; align-items: flex-start;
+  }
+  .modal-body .warn-box .icon { width: 15px; height: 15px; flex: none; margin-top: 1px; }
+  .modal-body label.checkbox {
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+    font-size: 12.5px; color: var(--text-2); padding: 10px 12px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; margin: 12px 0;
+  }
+  .modal-body label.checkbox input { margin-top: 2px; accent-color: var(--accent); width: 15px; height: 15px; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px 18px; }
+
+  .toasts { position: fixed; bottom: 22px; right: 22px; z-index: 90; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+  .toast {
+    background: var(--panel-2); border: 1px solid var(--border-2); border-left: 3px solid var(--green);
+    border-radius: 11px; box-shadow: var(--shadow); padding: 12px 14px;
+    display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text);
+    animation: toastIn .22s ease; overflow: hidden; position: relative;
+  }
+  .toast.err { border-left-color: var(--red); }
+  .toast.warn { border-left-color: var(--yellow); }
+  .toast .icon { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+  .toast .icon.check { color: var(--green); }
+  .toast.err .icon { color: var(--red); }
+  .toast.warn .icon { color: var(--yellow); }
+  .toast .toast-msg { flex: 1; line-height: 1.45; word-break: break-word; }
+  .toast .toast-close { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px; display: grid; place-items: center; flex: none; }
+  .toast .toast-close .icon { width: 13px; height: 13px; margin: 0; color: var(--muted); }
+  .toast .toast-bar { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--green); animation: toastbar 5s linear forwards; }
+  .toast.err .toast-bar { background: var(--red); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+  @keyframes toastbar { from { width: 100%; } to { width: 0; } }
+
+  .hidden { display: none !important; }
+
+  /* ============ Responsive ============ */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar {
+      position: sticky; top: 0; height: auto; z-index: 40;
+      flex-direction: row; align-items: center; padding: 10px 12px;
+      border-right: none; border-bottom: 1px solid var(--border);
+    }
+    .brand { padding: 0 8px 0 2px; }
+    .brand b { font-size: 13px; }
+    .brand span, .sidebar-foot { display: none; }
+    nav { flex-direction: row; gap: 2px; overflow-x: auto; }
+    .nav-item { padding: 8px 10px; font-size: 12px; }
+    .nav-item .nav-label { display: none; }
+    .main { padding: 18px 14px 50px; }
+    .form-row { flex-direction: column; gap: 6px; }
+    .form-row > label { width: auto; padding-top: 0; }
+    .form-row .ctrl { width: 100%; }
+    .c-grid { grid-template-columns: 1fr; }
+    .search-wrap { max-width: none; }
+    table.data th:nth-child(3), table.data td:nth-child(3) { display: none; }
+    .modal { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
 </style>
 </head>
 <body>
-  <h1>Unraid Container Backup</h1>
-  <div class="sub">Docker-Container sichern &amp; mit einem Klick wiederherstellen (Daten + Template + Container)</div>
 
-  <div class="statusbar" id="statusbar">
-    <div class="pill">Lade Status ...</div>
-  </div>
-
-  <div class="card">
-    <div class="card-head">
-      <h2>Container</h2>
-      <button onclick="backupAll()">Alle jetzt sichern</button>
+<div class="app">
+  <!-- ================= Sidebar ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div>
+      <div><b>Container Backup</b><span>for Unraid</span></div>
     </div>
-    <table>
-      <thead><tr><th>Name</th><th>Image</th><th>Status</th><th>Letztes Backup</th><th></th></tr></thead>
-      <tbody id="containerRows"><tr><td colspan="5" class="empty">Lade ...</td></tr></tbody>
-    </table>
-  </div>
+    <nav>
+      <button class="nav-item" data-page="dashboard"><span data-ico="dashboard"></span><span class="nav-label">Übersicht</span></button>
+      <button class="nav-item" data-page="containers"><span data-ico="box"></span><span class="nav-label">Container</span><span class="badge gray" id="navContainersBadge"></span></button>
+      <button class="nav-item" data-page="backups"><span data-ico="archive"></span><span class="nav-label">Backups</span><span class="badge gray" id="navBackupsBadge"></span></button>
+      <button class="nav-item" data-page="settings"><span data-ico="settings"></span><span class="nav-label">Einstellungen</span></button>
+      <button class="nav-item" data-page="jobs"><span data-ico="terminal"></span><span class="nav-label">Aufgaben</span><span class="badge gray" id="navJobsBadge"></span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="foot-pill" id="footStorage" title="Speicher-Ziel"><span class="dot" id="footStorageDot"></span><span id="footStorageText">Lade …</span></div>
+      <div class="foot-version" id="footVersion"></div>
+    </div>
+  </aside>
 
-  <div class="card">
-    <div class="card-head"><h2>Verfügbare Backups im Speicherziel</h2></div>
-    <table>
-      <thead><tr><th>Container</th><th>Backup</th><th>Größe</th><th>Datum</th><th></th></tr></thead>
-      <tbody id="backupRows"><tr><td colspan="5" class="empty">Lade ...</td></tr></tbody>
-    </table>
-  </div>
+  <!-- ================= Main ================= -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Übersicht</h1>
+        <p class="sub" id="pageSub"></p>
+      </div>
+      <div class="top-actions">
+        <button class="btn primary icon-lge" id="btnBackupAllTop" onclick="startBackupAll()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Alle jetzt sichern
+        </button>
+        <button class="btn secondary icon" onclick="refreshAll(true)" title="Manuell aktualisieren">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+        </button>
+      </div>
+    </header>
 
-  <div class="card">
-    <div class="card-head"><h2>Einstellungen</h2></div>
-    <div class="settings-body">
-      <div class="section-title">Backup-Ziel</div>
-      <div class="field-row">
-        <div class="field">
-          <label>Typ</label>
-          <select id="backup_type" onchange="toggleTarget()">
-            <option value="smb">SMB-Share</option>
-            <option value="s3">S3-Storage</option>
-          </select>
+    <!-- ============ Seite: Übersicht ============ -->
+    <section id="page-dashboard" class="page">
+      <div class="stat-grid" id="dashStats"></div>
+      <div class="card" style="margin-top:18px;">
+        <div class="card-head">
+          <h2><span data-ico="clock"></span> Letzte Aufgaben</h2>
+          <button class="btn secondary sm" onclick="go('jobs')">Alle anzeigen</button>
+        </div>
+        <div class="card-body" id="dashJobs"></div>
+      </div>
+    </section>
+
+    <!-- ============ Seite: Container ============ -->
+    <section id="page-containers" class="page hidden">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="containerSearch" placeholder="Container suchen …" oninput="renderContainers()">
+        </div>
+        <div class="chips" id="containerChips">
+          <button class="chip active" data-filter="all" onclick="setContainerFilter('all')">Alle <span class="count" id="chipAll"></span></button>
+          <button class="chip" data-filter="running" onclick="setContainerFilter('running')">Läuft <span class="count" id="chipRun"></span></button>
+          <button class="chip" data-filter="stopped" onclick="setContainerFilter('stopped')">Gestoppt <span class="count" id="chipStop"></span></button>
         </div>
       </div>
+      <div id="containerGrid"></div>
+    </section>
 
-      <div id="smbGroup">
-        <div class="section-title">SMB-Verbindung</div>
-        <div class="field-row">
-          <div class="field"><label>Host / IP <span class="req">*</span></label><input id="smb_host" placeholder="192.168.178.100"></div>
-          <div class="field"><label>Port</label><input id="smb_port" type="number" value="445"></div>
-          <div class="field"><label>Benutzer <span class="req">*</span></label><input id="smb_user"></div>
-          <div class="field"><label>Passwort <span class="req">*</span></label><input id="smb_pass" type="password" placeholder="••••••••"></div>
-          <div class="field"><label>Share <span class="req">*</span></label><input id="smb_share" placeholder="backup"></div>
-          <div class="field"><label>Unterverzeichnis</label><input id="smb_path" placeholder="unraid-containers"></div>
+    <!-- ============ Seite: Backups ============ -->
+    <section id="page-backups" class="page hidden">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="backupSearch" placeholder="Backups filtern …" oninput="renderBackups()">
         </div>
+        <button class="btn secondary sm" onclick="expandAll(true)" id="btnExpandAll">Alle aufklappen</button>
+        <button class="btn secondary sm hidden" onclick="expandAll(false)" id="btnCollapseAll">Alle zuklappen</button>
       </div>
+      <div id="backupGroups"></div>
+    </section>
 
-      <div id="s3Group" class="hidden">
-        <div class="section-title">S3-Verbindung</div>
-        <div class="field-row">
-          <div class="field"><label>Provider</label>
-            <select id="s3_provider">
-              <option value="AWS">AWS</option>
-              <option value="Minio">Minio</option>
-              <option value="Garage">Garage</option>
-              <option value="Ceph">Ceph</option>
-              <option value="DigitalOcean">DigitalOcean</option>
-              <option value="Other">Anderer (rclone)</option>
-            </select>
+    <!-- ============ Seite: Einstellungen ============ -->
+    <section id="page-settings" class="page hidden">
+      <div class="card">
+        <div class="settings-nav" id="settingsNav">
+          <button class="active" data-tab="target" onclick="setSettingsTab('target')">Speicher-Ziel</button>
+          <button data-tab="plan" onclick="setSettingsTab('plan')">Zeitplan &amp; Verhalten</button>
+          <button data-tab="filters" onclick="setSettingsTab('filters')">Ausschlüsse &amp; Pfade</button>
+          <button data-tab="advanced" onclick="setSettingsTab('advanced')">Erweitert</button>
+        </div>
+
+        <div class="settings-page" id="tab-target">
+          <div class="section-title"><span data-ico="database"></span> Backup-Typ</div>
+          <div class="type-tiles" id="typeTiles">
+            <button class="tile" data-type="smb" onclick="setBackupType('smb')">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+              <b>SMB-Share <span class="check"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></b>
+              <span>NAS / Samba-Server im Lokalnetz</span>
+            </button>
+            <button class="tile" data-type="s3" onclick="setBackupType('s3')">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+              <b>S3-Storage <span class="check"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></b>
+              <span>AWS, Minio, Garage, Wasabi, …</span>
+            </button>
           </div>
-          <div class="field"><label>Endpoint</label><input id="s3_endpoint" placeholder="https://s3.meine-domain.de (bei AWS leer)"></div>
-          <div class="field"><label>Region</label><input id="s3_region" value="us-east-1"></div>
-          <div class="field"><label>Bucket <span class="req">*</span></label><input id="s3_bucket"></div>
-          <div class="field"><label>Access Key <span class="req">*</span></label><input id="s3_access_key"></div>
-          <div class="field"><label>Secret Key <span class="req">*</span></label><input id="s3_secret_key" type="password" placeholder="••••••••"></div>
-          <div class="field"><label>Unterverzeichnis</label><input id="s3_path" placeholder="unraid-containers"></div>
+
+          <div id="settings-smb">
+            <div class="section-title" style="margin-top:22px;"><span data-ico="server"></span> SMB-Verbindung</div>
+            <div class="form-row">
+              <label><b>Host / IP <span class="req">*</span></b><small>Adresse des SMB-Servers</small></label>
+              <div class="ctrl"><input type="text" id="smb_host" placeholder="192.168.1.100"></div>
+            </div>
+            <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+              <div class="ctrl"><input type="text" id="smb_user" placeholder="Benutzername"><div class="hint">Benutzer mit Schreibrechten auf den Share</div></div>
+              <div class="ctrl"><input type="number" id="smb_port" min="1" max="65535" value="445"></div>
+              <div class="ctrl">
+                <div class="pw-wrap"><input type="password" id="smb_pass" placeholder="Passwort"><button class="pw-toggle" onclick="togglePw('smb_pass', this)" type="button"><svg class="icon icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></button></div>
+                <div class="hint">Wird nicht im Klartext angezeigt</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <label><b>Share <span class="req">*</span></b><small>Name des SMB-Shares</small></label>
+              <div class="ctrl"><input type="text" id="smb_share" placeholder="backup"></div>
+            </div>
+            <div class="form-row">
+              <label><b>Unterverzeichnis</b><small>Optionaler Teilpfad im Share, z. B. <code>unraid/backups</code></small></label>
+              <div class="ctrl"><input type="text" id="smb_path" placeholder="unraid-containers"></div>
+            </div>
+          </div>
+
+          <div id="settings-s3" class="hidden">
+            <div class="section-title" style="margin-top:22px;"><span data-ico="database"></span> S3-Verbindung</div>
+            <div class="form-row">
+              <label><b>Provider</b></label>
+              <div class="ctrl"><select id="s3_provider">
+                <option value="AWS">AWS</option>
+                <option value="Minio">Minio</option>
+                <option value="Garage">Garage</option>
+                <option value="Ceph">Ceph</option>
+                <option value="DigitalOcean">DigitalOcean</option>
+                <option value="Wasabi">Wasabi</option>
+                <option value="Backblaze B2">Backblaze B2</option>
+                <option value="Other">Anderer (rclone-Provider)</option>
+              </select></div>
+            </div>
+            <div class="form-row">
+              <label><b>Endpoint</b><small>z. B. Minio/Garage – bei AWS leer lassen</small></label>
+              <div class="ctrl"><input type="text" id="s3_endpoint" placeholder="https://s3.meine-domain.de"></div>
+            </div>
+            <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+              <div class="ctrl"><input type="text" id="s3_region" value="us-east-1"></div>
+              <div class="ctrl"><input type="text" id="s3_bucket" placeholder="Bucket-Name"><div class="hint">Bucket <b style="color:var(--red)">*</b> erforderlich</div></div>
+            </div>
+            <div class="form-row">
+              <label><b>Zugangsschlüssel <span class="req">*</span></b></label>
+              <div class="ctrl"><input type="text" id="s3_access_key" placeholder="Access Key ID"></div>
+            </div>
+            <div class="form-row">
+              <label><b>Geheimer Schlüssel <span class="req">*</span></b><small>Wird nicht im Klartext angezeigt</small></label>
+              <div class="ctrl"><div class="pw-wrap"><input type="password" id="s3_secret_key" placeholder="Secret Access Key"><button class="pw-toggle" onclick="togglePw('s3_secret_key', this)" type="button"><svg class="icon icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></button></div></div>
+            </div>
+            <div class="form-row">
+              <label><b>Unterverzeichnis</b><small>Optionaler Prefix im Bucket</small></label>
+              <div class="ctrl"><input type="text" id="s3_path" placeholder="unraid-containers"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page hidden" id="tab-plan">
+          <div class="section-title"><span data-ico="clock"></span> Zeitplan (Cron, UTC)</div>
+          <div class="form-row">
+            <label><b>Cron-Ausdruck</b><small>Wann automatisch gesichert wird</small></label>
+            <div class="ctrl">
+              <input type="text" id="schedule" placeholder="0 3 * * *" oninput="syncPreset()">
+              <div class="preset-chips" id="schedulePresets">
+                <button class="cron-preset" data-cron="0 3 * * *" onclick="setSchedule(this)">Täglich 03:00</button>
+                <button class="cron-preset" data-cron="0 */6 * * *" onclick="setSchedule(this)">Alle 6 Stunden</button>
+                <button class="cron-preset" data-cron="0 2 * * 0" onclick="setSchedule(this)">Sonntags 02:00</button>
+                <button class="cron-preset" data-cron="0 22 * * 5" onclick="setSchedule(this)">Freitags 22:00</button>
+                <button class="cron-preset" data-cron="0 1 */2 * *" onclick="setSchedule(this)">Alle 2 Tage</button>
+              </div>
+            </div>
+          </div>
+          <div class="section-title" style="margin-top:22px;"><span data-ico="layers"></span> Aufbewahrung &amp; Tempo</div>
+          <div class="form-row">
+            <label><b>Backups pro Container behalten</b><small><code>0</code> = alle behalten; danach werden die ältesten automatisch gelöscht</small></label>
+            <div class="ctrl"><input type="number" id="keep" min="0" value="0" style="max-width:120px;"></div>
+          </div>
+          <div class="form-row">
+            <label><b>Parallele Backups</b><small>Mehrere Container gleichzeitig sichern – spart Zeit, braucht aber mehr CPU/I/O</small></label>
+            <div class="ctrl">
+              <div class="range-row">
+                <input type="range" id="parallel" min="1" max="8" value="2" oninput="document.getElementById('parallelOut').value=this.value">
+                <output id="parallelOut">2</output>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <label><b>Bandbreitenlimit</b><small>rclone-Limit, leer = unbegrenzt. z. B. <code>8M</code>, <code>500K</code>, <code>off</code></small></label>
+            <div class="ctrl"><input type="text" id="bwlimit" placeholder="leer = unbegrenzt" style="max-width:220px;"></div>
+          </div>
+          <div class="form-row">
+            <label><b>Upload-Verifizierung</b><small>Größencheck des Backups auf dem Ziel nach dem Upload</small></label>
+            <div class="ctrl"><div class="toggle-row"><label class="switch"><input type="checkbox" id="verify_upload"><span class="slider"></span></label><div><b>Upload prüfen</b><small>Empfohlen – erkennt abgebrochene/beschädigte Uploads</small></div></div></div>
+          </div>
+        </div>
+
+        <div class="settings-page hidden" id="tab-filters">
+          <div class="section-title"><span data-ico="filter"></span> Ausschlüsse</div>
+          <div class="form-row">
+            <label><b>Ausgeschlossene Container</b><small>Kommagetrennte Namen, die nie gesichert werden</small></label>
+            <div class="ctrl"><input type="text" id="exclude" placeholder="container-backup"><div class="hint">Standard: <code>container-backup</code> (sich selbst nie sichern)</div></div>
+          </div>
+          <div class="form-row">
+            <label><b>Auszuschließende Mounts</b><small>Mounts, deren Quelle oder Ziel einen dieser Ausdrücke enthält (Kommagetrennt) – z. B. Caches</small></label>
+            <div class="ctrl"><input type="text" id="exclude_mounts" placeholder="z. B. /cache, plex/Library/Application Support"><div class="hint">Praxis-Tipp: große Caches wie <code>transcode</code> oder <code>cache</code> sparen Platz und Zeit</div></div>
+          </div>
+          <div class="section-title" style="margin-top:22px;"><span data-ico="box"></span> Unraid-Templates</div>
+          <div class="form-row">
+            <label><b>Template-Verzeichnis(e)</b><small>Wo die Community-Apps-Templates liegen (Kommagetrennt). Beim Restore wird ins erste geschrieben.</small></label>
+            <div class="ctrl"><input type="text" id="templates_dir" placeholder="/boot/config/plugins/dockerMan/templates-user"></div>
+          </div>
+        </div>
+
+        <div class="settings-page hidden" id="tab-advanced">
+          <div class="section-title"><span data-ico="settings"></span> Server</div>
+          <div class="form-row">
+            <label><b>Web-Port</b><small>Port der Weboberfläche – wirkt erst nach Container-Neustart</small></label>
+            <div class="ctrl"><input type="number" id="web_port" min="1" max="65535" style="max-width:140px;"></div>
+          </div>
+          <div class="form-row">
+            <label><b>rclone-Timeout (Sekunden)</b><small>Maximale Dauer eines einzelnen rclone-Befehls (Upload/Download)</small></label>
+            <div class="ctrl"><input type="number" id="rclone_timeout" min="10" style="max-width:140px;"></div>
+          </div>
+          <div class="section-title" style="margin-top:22px;"><span data-ico="hard-drive"></span> Zielpfad</div>
+          <div class="form-row">
+            <label><b>Auflösung</b><small>So wird das Ziel aufgelöst (rclone-Remote)</small></label>
+            <div class="ctrl"><div class="remote-preview" id="remotePreview">–</div></div>
+          </div>
+          <div class="section-title" style="margin-top:22px;"><span data-ico="shield-check"></span> Hinweis</div>
+          <div class="form-row">
+            <label><b>Sicherheit</b><small>Der Container hat Zugriff auf den Docker-Socket und damit volle Kontrolle über den Host</small></label>
+            <div class="ctrl"><p class="hint">Den Web-Port nicht ungeschützt ins Internet legen. Optional lässt sich über die Env-Variablen <code>WEB_USER</code> / <code>WEB_PASSWORD</code> ein Login aktivieren.</p></div>
+          </div>
+        </div>
+
+        <div class="settings-body" style="padding:18px;">
+          <div class="settings-actions">
+            <button class="btn secondary" id="testBtn" onclick="testConnection()">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Verbindung testen
+            </button>
+            <button class="btn primary" id="saveBtn" onclick="saveSettings()">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Speichern
+            </button>
+            <span class="settings-msg" id="settingsMsg"></span>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="section-title">Verhalten</div>
-      <div class="field-row">
-        <div class="field">
-          <label>Zeitplan (Cron, UTC)</label>
-          <input id="schedule" placeholder="0 3 * * *">
-          <div class="hint">z. B. <code>0 3 * * *</code> täglich 03:00 · <code>0 */6 * * *</code> alle 6 h · <code>0 2 * * 0</code> sonntags 02:00</div>
+    <!-- ============ Seite: Aufgaben ============ -->
+    <section id="page-jobs" class="page hidden">
+      <div class="toolbar">
+        <div class="chips">
+          <button class="chip active" data-filter="all" onclick="setJobFilter('all')">Alle</button>
+          <button class="chip" data-filter="running" onclick="setJobFilter('running')">Laufend</button>
+          <button class="chip" data-filter="done" onclick="setJobFilter('done')">Fertig</button>
+          <button class="chip" data-filter="error" onclick="setJobFilter('error')">Fehler</button>
         </div>
-        <div class="field">
-          <label>Backups pro Container behalten</label>
-          <input id="keep" type="number" min="0" value="0">
-          <div class="hint">0 = alle behalten</div>
-        </div>
-        <div class="field">
-          <label>Web-Port</label>
-          <input id="web_port" type="number" min="1" max="65535">
-          <div class="hint">wirkt erst nach Neustart des Containers</div>
-        </div>
-        <div class="field">
-          <label>rclone-Timeout (Sekunden)</label>
-          <input id="rclone_timeout" type="number" min="30" value="7200">
-        </div>
+        <div style="flex:1"></div>
+        <label class="chip" style="cursor:pointer;" title="Automatisch nach unten scrollen">
+          <input type="checkbox" id="autoScrollChk" checked onchange="state.jobAutoScroll=this.checked" style="accent-color:var(--accent);width:14px;height:14px;">
+          Auto-Scroll
+        </label>
+        <button class="btn secondary sm" onclick="clearFinishedJobs()">Erledigte ausblenden</button>
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Ausgeschlossene Container</label>
-          <input id="exclude" placeholder="container-backup">
-          <div class="hint">kommagetrennte Namen, die nicht gesichert werden</div>
-        </div>
-        <div class="field">
-          <label>Template-Verzeichnis(e)</label>
-          <input id="templates_dir" placeholder="/boot/config/plugins/dockerMan/templates-user">
-          <div class="hint">mehrere kommagetrennt; Restore schreibt ins erste</div>
-        </div>
-      </div>
+      <div class="jobs-list" id="jobsList"></div>
+      <div class="foot-pill" style="margin-top:12px;width:fit-content;">Logs werden auf die letzten <b>&nbsp;200 Aufgaben&nbsp;</b> begrenzt (Server-seitig)</div>
+    </section>
+  </main>
+</div>
 
-      <div class="settings-actions">
-        <button class="secondary" id="testBtn" onclick="testConnection()">Verbindung testen</button>
-        <button id="saveBtn" onclick="saveSettings()">Speichern</button>
-        <span class="settings-msg" id="settingsMsg"></span>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-head"><h2>Aufgaben</h2></div>
-    <div class="jobs" id="jobs"><div class="empty">Keine Aufgaben</div></div>
-  </div>
-
-  <div class="modal-bg" id="restoreModal">
-    <div class="modal">
-      <h3>Container wiederherstellen</h3>
-      <p id="restoreInfo"></p>
-      <p class="warn">Achtung: Vorhandene Daten an den Originalpfaden werden überschrieben.</p>
-      <label><input type="checkbox" id="overwriteChk"> Bestehenden Container ersetzen und Daten überschreiben</label>
-      <div class="modal-actions">
-        <button class="secondary" onclick="closeModal()">Abbrechen</button>
-        <button class="danger" onclick="confirmRestore()">Wiederherstellen</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
+<div id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
 
 <script>
-const $ = s => document.querySelector(s);
-let restoreTarget = null;
+"use strict";
+/* ============================ Icons ============================ */
+const ICON_PATHS = {
+  dashboard: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  box: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  "hard-drive": '<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  server: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
+  filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  list: '<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',
+};
+function icon(name, cls) {
+  return `<svg class="icon ${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ICON_PATHS.info}</svg>`;
+}
+document.querySelectorAll("[data-ico]").forEach(el => { el.innerHTML = icon(el.dataset.ico); });
 
-const NUMERIC_FIELDS = ["smb_port", "keep", "web_port", "rclone_timeout"];
-const SETTINGS_FIELDS = [
-  "backup_type",
-  "smb_host", "smb_port", "smb_user", "smb_pass", "smb_share", "smb_path",
-  "s3_provider", "s3_endpoint", "s3_region", "s3_bucket",
-  "s3_access_key", "s3_secret_key", "s3_path",
-  "schedule", "keep", "web_port", "exclude", "templates_dir", "rclone_timeout",
-];
+/* ============================ State ============================ */
+const state = {
+  status: null, containers: null, backups: [], jobs: [],
+  page: "dashboard",
+  containerFilter: "all", containerSearch: "",
+  backupSearch: "", openGroups: new Set(),
+  jobFilter: "all", jobAutoScroll: true, expandedJobs: new Set(),
+  settingsLoaded: false, settingsTab: "target",
+};
+
+const PAGE_META = {
+  dashboard: ["Übersicht", "Status, Statistiken und letzte Aktivitäten auf einen Blick"],
+  containers: ["Container", "Alle Docker-Container mit ihrem Backup-Status"],
+  backups: ["Backups", "Verfügbare Backups im Speicher-Ziel – sichern, wiederherstellen oder löschen"],
+  settings: ["Einstellungen", "Speicher-Ziel, Zeitplan und Verhalten konfigurieren"],
+  jobs: ["Aufgaben", "Live-Log aller laufenden und vergangenen Jobs"],
+};
+
+/* ============================ Helfer ============================ */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
 
 async function api(path, opts = {}) {
-  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const r = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
   if (!r.ok) {
     let detail = r.statusText;
-    try { detail = (await r.json()).detail || detail; } catch (e) {}
+    try { detail = (await r.json()).detail || detail; } catch (e) { /* skip */ }
     throw new Error(detail);
   }
   return r.json();
 }
 
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
 function fmtSize(b) {
-  if (!b) return "-";
+  if (b == null || b === 0) return "–";
   const u = ["B", "KB", "MB", "GB", "TB"];
   let i = 0;
   while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
   return b.toFixed(b >= 10 || i === 0 ? 0 : 1) + " " + u[i];
 }
 
-function fmtDate(iso) {
-  if (!iso) return "-";
+function fmtTime(iso) {
+  if (!iso) return "–";
   const d = new Date(iso);
-  return isNaN(d) ? iso : d.toLocaleString("de-DE");
+  return isNaN(d) ? "–" : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function toast(msg, isErr) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.className = "toast show" + (isErr ? " err" : "");
-  setTimeout(() => t.className = "toast", 6000);
+function backupTs(id) {
+  const m = /_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.tar$/.exec(id);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+  return isNaN(d) ? null : d.getTime();
 }
 
-function settingsMsg(text, isErr) {
-  const el = $("#settingsMsg");
-  el.textContent = text || "";
-  el.className = "settings-msg" + (isErr ? " err" : " ok");
-}
-
-/* ---------- Status ---------- */
-async function refreshStatus() {
-  try {
-    const s = await api("/api/status");
-    $("#statusbar").innerHTML =
-      `<div class="pill ${s.storage_ok ? "ok" : "err"}">Ziel: <b>${s.storage_type.toUpperCase()}</b> ${s.storage_ok ? "✓ erreichbar" : "✗ nicht erreichbar"}</div>` +
-      `<div class="pill">Pfad: <b>${s.remote}</b></div>` +
-      `<div class="pill">Plan: <b>${s.schedule}</b> (UTC)</div>` +
-      `<div class="pill">Behalten: <b>${s.keep || "alle"}</b></div>`;
-  } catch (e) {
-    $("#statusbar").innerHTML = `<div class="pill err">API-Fehler: <b>${e.message}</b></div>`;
+function backupEpochMs(b) {
+  if (b && b.mtime) {
+    const d = new Date(b.mtime);
+    if (!isNaN(d)) return d.getTime();
   }
+  return backupTs(b.id) || 0;
 }
 
-/* ---------- Container ---------- */
-async function refreshContainers() {
-  try {
-    const list = await api("/api/containers");
-    const tb = $("#containerRows");
-    if (!list.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">Keine Container gefunden</td></tr>'; return; }
-    tb.innerHTML = list.map(c => `
-      <tr>
-        <td><span class="state ${c.state}"></span>${c.name}</td>
-        <td><code>${c.image}</code></td>
-        <td>${c.state}</td>
-        <td>${c.last_backup ? c.last_backup : '<span style="color:var(--muted)">noch keins</span>'}</td>
-        <td><button class="secondary" onclick="backupOne('${c.name}')">Sichern</button></td>
-      </tr>`).join("");
-  } catch (e) {
-    $("#containerRows").innerHTML = `<tr><td colspan="5" class="empty">${e.message}</td></tr>`;
-  }
+function fmtAge(ms) {
+  if (!ms) return "–";
+  const diff = Date.now() - ms;
+  if (diff < 0) return "gerade eben";
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "gerade eben";
+  if (m < 60) return `vor ${m} Min.`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `vor ${h} Std.`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `vor ${d} Tagen`;
+  return new Date(ms).toLocaleDateString("de-DE");
 }
 
-/* ---------- Backups ---------- */
-async function refreshBackups() {
-  try {
-    const list = await api("/api/backups");
-    const rows = [];
-    for (const entry of list) {
-      for (const b of entry.backups.slice().reverse()) {
-        rows.push(`<tr>
-          <td>${entry.container}</td>
-          <td><code>${b.id}</code></td>
-          <td>${fmtSize(b.size)}</td>
-          <td>${fmtDate(b.mtime)}</td>
-          <td><button onclick="openRestore('${entry.container}','${b.id}')">Wiederherstellen</button></td>
-        </tr>`);
-      }
-    }
-    $("#backupRows").innerHTML = rows.length ? rows.join("") : '<tr><td colspan="5" class="empty">Noch keine Backups vorhanden</td></tr>';
-  } catch (e) {
-    $("#backupRows").innerHTML = `<tr><td colspan="5" class="empty">${e.message}</td></tr>`;
-  }
+function toast(msg, type = "ok", ms = 5000) {
+  const icons = { ok: "check", err: "alert", warn: "alert" };
+  const el = document.createElement("div");
+  el.className = "toast" + (type === "err" ? " err" : type === "warn" ? " warn" : "");
+  el.innerHTML = `<span class="icon ${icons[type]}">${icon(icons[type])}</span>
+    <div class="toast-msg">${esc(msg)}</div>
+    <button class="toast-close" onclick="this.parentElement.remove()">${icon("x")}</button>
+    <div class="toast-bar"></div>`;
+  $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), ms);
+  while ($("#toasts").children.length > 4) $("#toasts").firstChild.remove();
 }
 
-/* ---------- Jobs ---------- */
-async function refreshJobs() {
-  try {
-    const jobs = await api("/api/jobs");
-    const el = $("#jobs");
-    if (!jobs.length) { el.innerHTML = '<div class="empty">Keine Aufgaben</div>'; return; }
-    el.innerHTML = jobs.map(j => `
-      <div class="job">
-        <div class="job-title">
-          <span>${j.title}</span>
-          <span class="job-status ${j.status}">${j.status === "running" ? "läuft ..." : j.status === "done" ? "fertig" : "Fehler"}</span>
+function confirmDialog({ title, body, confirmLabel = "Bestätigen", cancelLabel = "Abbrechen", danger = false, icon: ico = "alert" }) {
+  return new Promise(resolve => {
+    const root = $("#modalRoot");
+    root.innerHTML = `
+      <div class="modal-bg open" onclick="if(event.target===this)this.closest('.modal-bg')?.__resolve(false)">
+        <div class="modal" style="width:430px;">
+          <div class="modal-head">
+            <div class="modal-icon ${danger ? "danger" : "warn"}">${icon(ico)}</div>
+            <h3>${esc(title)}</h3>
+            <button class="modal-close" onclick="this.closest('.modal-bg').__resolve(false)">${icon("x")}</button>
+          </div>
+          <div class="modal-body">${body}</div>
+          <div class="modal-foot">
+            <button class="btn secondary" onclick="this.closest('.modal-bg').__resolve(false)">${esc(cancelLabel)}</button>
+            <button class="btn ${danger ? "danger" : "primary"}" onclick="this.closest('.modal-bg').__resolve(true)">${esc(confirmLabel)}</button>
+          </div>
         </div>
-        ${j.error ? `<div class="job-log" style="color:var(--red)">${j.error}</div>` : ""}
-        ${j.log && j.log.length ? `<div class="job-log">${j.log.slice(-40).join("\n")}</div>` : ""}
-      </div>`).join("");
-  } catch (e) {}
+      </div>`;
+    const bg = root.querySelector(".modal-bg");
+    bg.__resolve = v => { bg.classList.remove("open"); root.innerHTML = ""; resolve(v); };
+    document.addEventListener("keydown", function h(e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", h); bg.__resolve(false); }
+    });
+  });
 }
 
-/* ---------- Backup-Aktionen ---------- */
-async function backupAll() {
+/* ============================ Navigation ============================ */
+function go(page) {
+  state.page = page;
+  $$(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  $$(".page").forEach(s => s.classList.toggle("hidden", s.id !== "page-" + page));
+  $("#pageTitle").textContent = PAGE_META[page][0];
+  $("#pageSub").textContent = PAGE_META[page][1];
+  if (page === "containers") renderContainers();
+  if (page === "backups") renderBackups();
+  if (page === "jobs") renderJobs();
+  if (page === "settings" && !state.settingsLoaded) loadSettings();
+  if (page === "dashboard") renderDashboard();
+}
+
+/* ============================ API-Aufrufe ============================ */
+const lastFetch = { status: 0, containers: 0, backups: 0, jobs: 0 };
+
+async function refreshStatus(force = false) {
+  const now = Date.now();
+  if (!force && now - lastFetch.status < 25000) return state.status;
+  lastFetch.status = now;
   try {
-    await api("/api/backup", { method: "POST", body: JSON.stringify({ all: true }) });
-    toast("Backup gestartet");
-    refreshJobs();
-  } catch (e) { toast(e.message, true); }
+    state.status = await api("/api/status");
+  } catch (e) {
+    state.status = null;
+    if (state.page === "dashboard") {
+      $("#dashStats").innerHTML = emptyState("alert", "API nicht erreichbar", esc(e.message));
+    }
+  }
+  renderSidebar();
+  if (state.page === "dashboard") renderDashboard();
+  return state.status;
 }
 
-async function backupOne(name) {
+async function refreshContainers(force = false) {
+  const now = Date.now();
+  if (!force && now - lastFetch.containers < 12000) return state.containers;
+  lastFetch.containers = now;
+  try {
+    state.containers = await api("/api/containers");
+  } catch (e) {
+    state.containers = null;
+    $("#containerGrid").innerHTML = emptyState("alert", "Docker nicht erreichbar", esc(e.message));
+  }
+  renderSidebar();
+  if (state.page === "containers") renderContainers();
+  return state.containers;
+}
+
+async function refreshBackups(force = false) {
+  const now = Date.now();
+  if (!force && now - lastFetch.backups < 25000) return state.backups;
+  lastFetch.backups = now;
+  try {
+    state.backups = await api("/api/backups");
+  } catch (e) {
+    state.backups = [];
+  }
+  renderSidebar();
+  if (state.page === "backups") renderBackups();
+  return state.backups;
+}
+
+async function refreshJobs(force = false) {
+  if (!force && Date.now() - lastFetch.jobs < 2500) return state.jobs;
+  lastFetch.jobs = Date.now();
+  try {
+    state.jobs = await api("/api/jobs");
+  } catch (e) { return state.jobs; }
+  renderSidebar();
+  if (state.page === "jobs" || state.page === "dashboard") { renderJobs(); renderDashboard(); }
+  return state.jobs;
+}
+
+function refreshAll(force = false) {
+  refreshStatus(force);
+  refreshContainers(force);
+  refreshBackups(force);
+  refreshJobs(force);
+}
+
+/* ============================ Sidebar ============================ */
+function renderSidebar() {
+  const s = state.status;
+  const foot = $("#footStorage");
+  if (!s) {
+    $("#footStorageDot").className = "dot warn";
+    $("#footStorageText").textContent = "Status unbekannt";
+  } else {
+    $("#footStorageDot").className = "dot " + (s.storage_ok ? "run" : "err");
+    $("#footStorageText").textContent = `${(s.storage_type || "?").toUpperCase()} ${s.storage_ok ? "erreichbar" : "nicht erreichbar"}`;
+    $("#footVersion").textContent = "v" + (s.version || "?");
+  }
+  const cs = state.containers;
+  const nb = $("#navContainersBadge");
+  if (cs) {
+    nb.textContent = cs.length;
+    nb.classList.toggle("hidden", !cs.length);
+  }
+  const bks = state.backups.reduce((n, g) => n + g.backups.length, 0);
+  const ab = $("#navBackupsBadge");
+  ab.textContent = bks;
+  ab.classList.toggle("hidden", !bks);
+  const runningJobs = state.jobs.filter(j => j.status === "running").length;
+  const jb = $("#navJobsBadge");
+  if (runningJobs) { jb.textContent = runningJobs + " läuft"; jb.className = "badge blue"; }
+  else { jb.textContent = ""; jb.className = "badge gray hidden"; }
+  document.title = runningJobs ? `(${runningJobs}) Unraid Container Backup` : "Unraid Container Backup";
+}
+
+function emptyState(ico, title, text) {
+  return `<div class="empty-state">${icon(ico)}<b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ""}</div>`;
+}
+
+/* ============================ Dashboard ============================ */
+function renderDashboard() {
+  const s = state.status;
+  const grid = $("#dashStats");
+  if (!s) {
+    grid.innerHTML = `<div class="stat-card" style="grid-column:1/-1"><div class="stat-val skeleton">Laden</div></div>`;
+    return;
+  }
+  const st = s.stats || {};
+  const runningCount = state.containers ? state.containers.filter(c => c.running).length : null;
+  const nextRun = s.next_run ? new Date(s.next_run) : null;
+  const lastTs = st.last_backup_ts ? new Date(st.last_backup_ts).getTime() : null;
+  const storageOk = s.storage_ok;
+
+  const cards = [
+    { ico: "box", label: "Container gesichert", val: String(st.containers ?? "–"),
+      sub: runningCount == null ? "Docker: n/a" : `${runningCount} laufen gerade`, icoCls: "box" },
+    { ico: "archive", label: "Backups", val: String(st.backups ?? "–"),
+      sub: `${fmtSize(st.total_bytes)} belegt`, icoCls: "archive" },
+    { ico: "clock", label: "Nächster Lauf", val: nextRun ? nextRun.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "–",
+      sub: nextRun ? nextRun.toLocaleDateString("de-DE") + " (UTC)" : `Cron: ${esc(s.schedule || "")}`, icoCls: "clock" },
+    { ico: "shield", label: "Letztes Backup", val: lastTs ? fmtAge(lastTs) : "noch keins",
+      sub: st.last_backup_container ? esc(st.last_backup_container) : "keine Daten", icoCls: "shield" },
+    { ico: "database", label: "Speicher-Ziel", val: (s.storage_type || "?").toUpperCase(),
+      sub: storageOk ? "erreichbar" : "nicht erreichbar", ok: storageOk, icoCls: "database" },
+    { ico: "layers", label: "Upload-Verifizierung", val: s.verify_uploads ? "aktiv" : "aus",
+      sub: "atomarer Upload (.part)", icoCls: "layers" },
+  ];
+  grid.innerHTML = cards.map(c => `
+    <div class="stat-card">
+      <div class="stat-icon">${icon(c.icoCls || c.ico)}</div>
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-val">${c.val}</div>
+      <div class="stat-sub">${c.sub.includes("nicht erreichbar") ? `<span class="dot err" style="vertical-align:1px;margin-right:5px;"></span>` : c.ico === "box" ? `<span class="dot run" style="vertical-align:1px;margin-right:5px;"></span>` : ""}${c.sub}</div>
+    </div>`).join("");
+
+  const jobsEl = $("#dashJobs");
+  const recent = state.jobs.slice(0, 6);
+  if (!recent.length) {
+    jobsEl.innerHTML = emptyState("list", "Noch keine Aufgaben", "Starte ein Backup oder warte auf den geplanten Lauf – hier erscheint das Live-Log.");
+  } else {
+    jobsEl.innerHTML = recent.map(j => `
+      <div class="job-card ${j.status}" style="margin-bottom:10px;">
+        <div class="job-head" style="cursor:default;">
+          <div class="job-icon ${esc(j.kind || "job")}">${icon(j.kind === "restore" ? "download" : j.kind === "scheduled" ? "clock" : "zap")}</div>
+          <div class="job-main">
+            <b>${esc(j.title)}</b>
+            <div class="job-sub">${fmtTime(j.started)} · ${j.duration != null ? j.duration + " s" : "läuft …"}</div>
+          </div>
+          <span class="badge job-badge ${j.status === "running" ? "yellow" : j.status === "done" ? "green" : "red"}">${j.status === "running" ? "läuft" : j.status === "done" ? "fertig" : "Fehler"}</span>
+        </div>
+        ${j.error ? `<div class="job-error">${esc(j.error)}</div>` : ""}
+      </div>`).join("");
+  }
+}
+
+/* ============================ Container ============================ */
+function setContainerFilter(f) {
+  state.containerFilter = f;
+  $$("#containerChips .chip").forEach(c => c.classList.toggle("active", c.dataset.filter === f));
+  renderContainers();
+}
+
+function renderContainers() {
+  const grid = $("#containerGrid");
+  const list = state.containers;
+  if (list === null) {
+    grid.innerHTML = `<div class="stat-card skeleton" style="grid-column:1/-1;padding:40px;">Lade Container …</div>`;
+    return;
+  }
+  if (!list.length) {
+    grid.innerHTML = emptyState("box", "Keine Container gefunden", "Der Docker-Socket ist verbunden, aber es wurden keine Container gemeldet.");
+    return;
+  }
+  const q = state.containerSearch.trim().toLowerCase();
+  let filtered = list.filter(c =>
+    (state.containerFilter === "all" ||
+      (state.containerFilter === "running" && c.running) ||
+      (state.containerFilter === "stopped" && !c.running)) &&
+    (!q || c.name.toLowerCase().includes(q) || (c.image || "").toLowerCase().includes(q))
+  );
+  $("#chipAll").textContent = list.length;
+  $("#chipRun").textContent = list.filter(c => c.running).length;
+  $("#chipStop").textContent = list.filter(c => !c.running).length;
+
+  if (!filtered.length) {
+    grid.innerHTML = emptyState("search", "Keine Treffer", "Kein Container passt zu Filter oder Suchbegriff.");
+    return;
+  }
+
+  const stateDot = c => c.running ? "run" : (c.state === "exited" || c.state === "dead" ? "stop" : "warn");
+  const stateLabel = c => c.running ? "läuft" : c.state;
+  const stateBadge = c => c.running ? "green" : (c.state === "exited" || c.state === "dead" ? "gray" : "yellow");
+
+  grid.innerHTML = filtered.map(c => {
+    const lastTs = c.last_backup ? backupTs(c.last_backup) : null;
+    return `
+    <div class="c-card">
+      <div class="c-head">
+        <span class="dot ${stateDot(c)}"></span>
+        <div class="c-title">
+          <b>${esc(c.name)}</b>
+          <span class="c-image">${esc(c.image || "?")}</span>
+        </div>
+        <span class="badge ${stateBadge(c)}"><span class="dot"></span>${esc(stateLabel(c))}</span>
+      </div>
+      <div class="c-meta">
+        <div class="c-meta-item">${icon("layers")} <b>${c.backup_count || 0}</b> Backups</div>
+        <div class="c-meta-item">${icon("clock")} ${c.last_backup ? fmtAge(lastTs) : "kein Backup"}</div>
+        <div class="c-meta-item">${icon("hard-drive")} ${c.last_backup_size ? fmtSize(c.last_backup_size) : "–"}</div>
+      </div>
+      <div class="c-actions">
+        <button class="btn sm primary" onclick="startBackupOne('${esc(c.name)}')" ${c.running ? "" : ""}>${icon("zap")} Sichern</button>
+        <button class="btn sm secondary" onclick="openRestoreFor('${esc(c.name)}')" ${c.backup_count ? "" : "disabled title='Noch keine Backups vorhanden'"}>${icon("download")} Wiederherstellen</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function startBackupOne(name) {
   try {
     await api("/api/backup", { method: "POST", body: JSON.stringify({ containers: [name] }) });
-    toast(`Backup von '${name}' gestartet`);
-    refreshJobs();
-  } catch (e) { toast(e.message, true); }
+    toast(`Backup von '${name}' gestartet`, "ok");
+    go("jobs");
+    refreshJobs(true);
+  } catch (e) { toast(e.message, "err"); }
 }
 
-/* ---------- Restore ---------- */
-function openRestore(container, backupId) {
-  restoreTarget = { container, backupId };
-  $("#restoreInfo").innerHTML = `Container <b>${container}</b><br>Backup: <code>${backupId}</code><br><br>Es werden wiederhergestellt:<br>• Daten an den Originalpfaden<br>• Unraid-Template (Community Apps)<br>• Container (Image, Ports, Env, Netzwerk, Restart-Policy)`;
-  $("#overwriteChk").checked = false;
-  $("#restoreModal").classList.add("open");
+async function startBackupAll() {
+  const btn = $("#btnBackupAllTop");
+  btn.disabled = true;
+  try {
+    await api("/api/backup", { method: "POST", body: JSON.stringify({ all: true }) });
+    toast("Backup aller Container gestartet", "ok");
+    go("jobs");
+    refreshJobs(true);
+  } catch (e) { toast(e.message, "err"); }
+  finally { btn.disabled = false; }
 }
 
-function closeModal() { $("#restoreModal").classList.remove("open"); restoreTarget = null; }
+/* ============================ Backups ============================ */
+function expandAll(open) {
+  const groups = state.backups.map(g => g.container).filter(c => c);
+  groups.forEach(c => open ? state.openGroups.add(c) : state.openGroups.delete(c));
+  $("#btnExpandAll").classList.toggle("hidden", open);
+  $("#btnCollapseAll").classList.toggle("hidden", !open);
+  renderBackups();
+}
 
-async function confirmRestore() {
-  if (!restoreTarget) return;
-  const { container, backupId } = restoreTarget;
-  const overwrite = $("#overwriteChk").checked;
-  closeModal();
+function toggleGroup(name) {
+  if (state.openGroups.has(name)) state.openGroups.delete(name);
+  else state.openGroups.add(name);
+  renderBackups();
+}
+
+function renderBackups() {
+  const root = $("#backupGroups");
+  if (!state.backups.length) {
+    root.innerHTML = emptyState("archive", "Noch keine Backups vorhanden",
+      "Backups erscheinen hier, sobald mindestens ein Container gesichert wurde – entweder über die Schaltflächen oben oder automatisch durch den Zeitplan.");
+    return;
+  }
+  const q = state.backupSearch.trim().toLowerCase();
+  const groups = state.backups
+    .map(g => ({ ...g, backups: g.backups.filter(b => !q || g.container.toLowerCase().includes(q) || b.id.toLowerCase().includes(q)) }))
+    .filter(g => g.backups.length)
+    .sort((a, b) => {
+      const at = a.backups.reduce((m, x) => Math.max(m, backupEpochMs(x)), 0);
+      const bt = b.backups.reduce((m, x) => Math.max(m, backupEpochMs(x)), 0);
+      return bt - at;
+    });
+
+  if (!groups.length) {
+    root.innerHTML = emptyState("search", "Keine Treffer", "Kein Backup passt zur Suche oder es sind keine Backups vorhanden.");
+    return;
+  }
+
+  root.innerHTML = groups.map(g => {
+    const open = state.openGroups.has(g.container);
+    const hasNewer = g.backups.length > 1;
+    return `
+    <div class="b-group ${open ? "open" : ""}">
+      <button class="b-group-head" onclick="toggleGroup('${esc(g.container)}')">
+        <span class="dot ${open ? "run" : ""}"></span>
+        <b>${esc(g.container)}</b>
+        <span class="g-count">${g.backups.length} ${g.backups.length === 1 ? "Backup" : "Backups"}</span>
+        ${icon("chev", "chev")}
+      </button>
+      <div class="b-group-body">
+        <table class="data">
+          <thead><tr><th>Backup</th><th>Größe</th><th>Alter</th><th style="text-align:right;">Aktionen</th></tr></thead>
+          <tbody>
+            ${[...g.backups].reverse().map(b => {
+              const ts = backupEpochMs(b);
+              return `
+              <tr>
+                <td><span class="bk-id" title="${esc(b.id)}">${esc(b.id)}</span></td>
+                <td>${fmtSize(b.size)}</td>
+                <td>${fmtAge(ts)}</td>
+                <td>
+                  <div class="row-actions">
+                    <button class="icon-btn" onclick="openRestoreFor('${esc(g.container)}','${esc(b.id)}')" title="Wiederherstellen">${icon("download")} Restore</button>
+                    <button class="icon-btn danger" onclick="deleteBackup('${esc(g.container)}','${esc(b.id)}')" title="Backup löschen">${icon("trash")}</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function deleteBackup(container, backupId) {
+  const ok = await confirmDialog({
+    title: "Backup löschen",
+    danger: true, icon: "trash",
+    body: `<div class="kv"><dt>Container</dt><dd>${esc(container)}</dd><dt>Backup</dt><dd>${esc(backupId)}</dd></div>
+      <div class="warn-box">${icon("alert")}<span>Dieses Backup wird <b>unwiderruflich</b> vom Speicher-Ziel gelöscht. Ein Wiederherstellen ist danach nicht mehr möglich.</span></div>`,
+    confirmLabel: "Endgültig löschen",
+  });
+  if (!ok) return;
+  try {
+    await api(`/api/backups/${encodeURIComponent(container)}/${encodeURIComponent(backupId)}`, { method: "DELETE" });
+    toast(`Backup '${backupId}' gelöscht`, "ok");
+    refreshBackups(true); refreshStatus(true);
+  } catch (e) { toast(e.message, "err"); }
+}
+
+/* ============================ Restore-Modal ============================ */
+function openRestoreFor(container, presetBackupId) {
+  const group = state.backups.find(g => g.container === container);
+  if (!group || !group.backups.length) { toast(`Für '${container}' gibt es keine Backups`, "warn"); return; }
+  const opts = [...group.backups].reverse().map(b => {
+    const ts = backupEpochMs(b);
+    return `<option value="${esc(b.id)}">${esc(b.id)} (${fmtSize(b.size)}, ${fmtAge(ts)})</option>`;
+  }).join("");
+  const containerInfo = state.containers ? state.containers.find(c => c.name === container) : null;
+  const running = containerInfo ? containerInfo.running : false;
+
+  const root = $("#modalRoot");
+  root.innerHTML = `
+    <div class="modal-bg open" onclick="if(event.target===this)this.__resolve(false)">
+      <div class="modal">
+        <div class="modal-head">
+          <div class="modal-icon warn">${icon("download")}</div>
+          <h3>Container wiederherstellen</h3>
+          <button class="modal-close" onclick="this.closest('.modal-bg').__resolve(false)">${icon("x")}</button>
+        </div>
+        <div class="modal-body">
+          <div class="kv">
+            <dt>Container</dt><dd>${esc(container)}</dd>
+            <dt>Backup</dt><dd style="display:flex;flex-direction:column;gap:6px;"><select id="restoreBackupSel" style="width:100%;">${opts}</select></dd>
+          </div>
+          <div class="warn-box">${icon("alert")}<span>Vorhandene Daten an den Originalpfaden werden überschrieben${running ? " – der Container läuft aktuell und wird ersetzt" : ""}.</span></div>
+          <label class="checkbox"><input type="checkbox" id="restoreOverwriteChk" ${running ? "checked" : ""}>
+            <span><b>Bestehenden Container ersetzen</b><br>Überschreibt Daten und legt den Container neu an (inkl. Image, Ports, Env, Netzwerk, Template).</span></label>
+        </div>
+        <div class="modal-foot">
+          <button class="btn secondary" onclick="this.closest('.modal-bg').__resolve(false)">Abbrechen</button>
+          <button class="btn primary" onclick="confirmRestoreModal('${esc(container)}', '${esc(presetBackupId || "")}')">${icon("download")} Wiederherstellen</button>
+        </div>
+      </div>
+    </div>`;
+  const bg = root.querySelector(".modal-bg");
+  bg.__resolve = v => { bg.classList.remove("open"); root.innerHTML = ""; };
+  if (presetBackupId) $("#restoreBackupSel").value = presetBackupId;
+}
+
+async function confirmRestoreModal(container, presetBackupId) {
+  const backupId = $("#restoreBackupSel") ? $("#restoreBackupSel").value : (presetBackupId || null);
+  const overwrite = $("#restoreOverwriteChk") ? $("#restoreOverwriteChk").checked : false;
+  $("#modalRoot").innerHTML = "";
   try {
     await api("/api/restore", { method: "POST", body: JSON.stringify({ container, backup_id: backupId, overwrite }) });
-    toast(`Wiederherstellung von '${container}' gestartet`);
-    refreshJobs();
-  } catch (e) { toast(e.message, true); }
+    toast(`Wiederherstellung von '${container}' gestartet`, "ok");
+    go("jobs");
+    refreshJobs(true);
+  } catch (e) { toast(e.message, "err"); }
 }
 
-/* ---------- Einstellungen ---------- */
-function toggleTarget() {
-  const type = $("#backup_type").value;
-  $("#smbGroup").classList.toggle("hidden", type !== "smb");
-  $("#s3Group").classList.toggle("hidden", type !== "s3");
+/* ============================ Aufgaben / Jobs ============================ */
+function setJobFilter(f) {
+  state.jobFilter = f;
+  $$("#page-jobs .chips .chip").forEach(c => c.classList.toggle("active", c.dataset.filter === f));
+  renderJobs();
+}
+
+function toggleJob(id) {
+  if (state.expandedJobs.has(id)) state.expandedJobs.delete(id);
+  else state.expandedJobs.add(id);
+  renderJobs();
+}
+
+function clearFinishedJobs() {
+  state.jobs = state.jobs.filter(j => j.status === "running");
+  renderJobs();
+}
+
+function renderJobs() {
+  const list = $("#jobsList");
+  let jobs = state.jobs.filter(j =>
+    state.jobFilter === "all" || j.status === state.jobFilter);
+  jobs = [...jobs].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1) || b.started.localeCompare(a.started));
+
+  if (!jobs.length) {
+    list.innerHTML = emptyState(
+      state.jobFilter === "all" ? "terminal" : "search",
+      state.jobFilter === "all" ? "Keine Aufgaben" : "Keine passenden Aufgaben",
+      state.jobFilter === "all" ? "Gestartete Backups und Wiederherstellungen erscheinen hier mit Live-Log." : "Für diesen Filter gibt es gerade nichts."
+    );
+    return;
+  }
+
+  const wasAtBottom = state.jobAutoScroll && list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+  list.innerHTML = jobs.map(j => {
+    const open = j.status === "running" || state.expandedJobs.has(j.id);
+    const logHtml = j.log && j.log.length
+      ? `<pre class="job-log">${esc(j.log.slice(-200).join("\n"))}</pre>` : "";
+    const errHtml = j.error ? `<div class="job-error">${
+      /* Fehlerzeilen einzeln brechen */
+      esc(String(j.error).split("\n").join("\n"))
+    }</div>` : "";
+    return `
+    <div class="job-card ${j.status} ${open ? "open" : ""}" id="job-${j.id}">
+      <div class="job-head" onclick="toggleJob('${j.id}')">
+        <div class="job-icon ${esc(j.kind || "job")}">${icon(j.kind === "restore" ? "download" : j.kind === "scheduled" ? "clock" : "zap")}</div>
+        <div class="job-main">
+          <b>${esc(j.title)}</b>
+          <div class="job-sub">gestartet ${fmtTime(j.started)}${j.finished ? " · beendet " + fmtTime(j.finished) : ""}${j.duration != null ? " · Dauer " + j.duration + " s" : ""}</div>
+        </div>
+        <span class="badge job-badge ${j.status === "running" ? "yellow" : j.status === "done" ? "green" : "red"}">${j.status === "running" ? "läuft …" : j.status === "done" ? "fertig" : "Fehler"}</span>
+        ${icon("chev", "job-chev")}
+      </div>
+      ${errHtml}
+      ${logHtml}
+    </div>`;
+  }).join("");
+
+  const anchor = document.getElementById("job-" + (jobs[0] && jobs[0].id));
+  if (state.jobAutoScroll && wasAtBottom && anchor) list.scrollTop = list.scrollHeight;
+}
+
+/* ============================ Einstellungen ============================ */
+const SETTINGS_NUMERIC = ["smb_port", "keep", "web_port", "rclone_timeout", "parallel"];
+const SETTINGS_FIELDS = [
+  "backup_type",
+  "smb_host", "smb_port", "smb_user", "smb_pass", "smb_share", "smb_path",
+  "s3_provider", "s3_endpoint", "s3_region", "s3_bucket",
+  "s3_access_key", "s3_secret_key", "s3_path",
+  "schedule", "keep", "web_port", "exclude", "exclude_mounts",
+  "templates_dir", "rclone_timeout", "parallel", "bwlimit", "verify_upload",
+];
+
+function setSettingsTab(tab) {
+  state.settingsTab = tab;
+  $$("#settingsNav button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  ["target", "plan", "filters", "advanced"].forEach(t =>
+    $("#tab-" + t).classList.toggle("hidden", t !== tab));
+}
+
+function setBackupType(t) {
+  $("#backup_type").value = t;
+  $$("#typeTiles .tile").forEach(el => el.classList.toggle("sel", el.dataset.type === t));
+  $("#settings-smb").classList.toggle("hidden", t !== "smb");
+  $("#settings-s3").classList.toggle("hidden", t !== "s3");
+  updateRemotePreview();
+}
+
+function togglePw(id, btn) {
+  const inp = $("#" + id);
+  inp.type = inp.type === "password" ? "text" : "password";
+  btn.classList.toggle("off", inp.type === "text");
+}
+
+function syncPreset() {
+  const v = $("#schedule").value.trim();
+  $$("#schedulePresets .cron-preset").forEach(p =>
+    p.classList.toggle("active", p.dataset.cron === v));
+}
+
+function setSchedule(btn) {
+  $("#schedule").value = btn.dataset.cron;
+  syncPreset();
+}
+
+function updateRemotePreview() {
+  const t = $("#backup_type").value;
+  const g = t === "smb"
+    ? `backup:${$("#smb_share").value || "…"}/${$("#smb_path").value}`
+    : `backup:${$("#s3_bucket").value || "…"}/${$("#s3_path").value}`;
+  $("#remotePreview").textContent = g.replace(/\/+$/, "");
 }
 
 function fillSettings(s) {
   for (const f of SETTINGS_FIELDS) {
     const el = $("#" + f);
-    if (el && s[f] !== undefined && s[f] !== null) el.value = s[f];
+    if (el && s[f] !== undefined && s[f] !== null) {
+      if (f === "verify_upload") el.checked = !!s[f];
+      else {
+        el.value = s[f];
+        if (f === "parallel") $("#parallelOut").value = s[f];
+      }
+    }
   }
-  toggleTarget();
+  setBackupType(s.backup_type);
+  syncPreset();
+  settingsMsg("");
 }
 
 function collectSettings() {
@@ -396,54 +1493,94 @@ function collectSettings() {
   for (const f of SETTINGS_FIELDS) {
     const el = $("#" + f);
     if (!el) continue;
-    let v = el.value.trim();
-    if (NUMERIC_FIELDS.includes(f)) v = v === "" ? "" : parseInt(v, 10);
-    out[f] = v;
+    if (f === "verify_upload") out[f] = el.checked;
+    else {
+      let v = el.value.trim();
+      if (SETTINGS_NUMERIC.includes(f)) v = v === "" ? "" : parseInt(v, 10);
+      out[f] = v;
+    }
   }
   return out;
 }
 
+function settingsMsg(text, isErr) {
+  const el = $("#settingsMsg");
+  if (!text || !text.trim()) { el.innerHTML = ""; return; }
+  el.innerHTML = `${icon(isErr ? "alert" : "check")} ${esc(text)}`;
+  el.className = "settings-msg " + (isErr ? "err" : "ok");
+}
+
 async function loadSettings() {
   try {
-    fillSettings(await api("/api/settings"));
+    const s = await api("/api/settings");
+    fillSettings(s);
+    state.settingsLoaded = true;
   } catch (e) {
     settingsMsg("Einstellungen konnten nicht geladen werden: " + e.message, true);
   }
 }
 
 async function testConnection() {
-  settingsMsg("Teste Verbindung ...");
-  $("#testBtn").disabled = true;
+  settingsMsg("Teste Verbindung …");
+  const btn = $("#testBtn");
+  btn.classList.add("loading"); btn.disabled = true;
   try {
     const r = await api("/api/settings/test", { method: "POST", body: JSON.stringify(collectSettings()) });
-    settingsMsg(r.ok ? "✓ Verbindung erfolgreich" : "✗ Ziel nicht erreichbar – Werte prüfen", !r.ok);
+    settingsMsg(r.ok ? "Verbindung erfolgreich – Ziel erreichbar" : "Ziel nicht erreichbar – Zugangsdaten und Netzwerk prüfen", !r.ok);
+    if (r.ok) toast("Verbindung zum Speicher-Ziel erfolgreich", "ok");
   } catch (e) {
-    settingsMsg("✗ " + e.message, true);
+    settingsMsg(e.message, true);
   } finally {
-    $("#testBtn").disabled = false;
+    btn.classList.remove("loading"); btn.disabled = false;
   }
 }
 
 async function saveSettings() {
-  settingsMsg("Speichere ...");
-  $("#saveBtn").disabled = true;
+  settingsMsg("Speichere …");
+  const btn = $("#saveBtn");
+  btn.classList.add("loading"); btn.disabled = true;
   try {
     const r = await api("/api/settings", { method: "POST", body: JSON.stringify(collectSettings()) });
-    settingsMsg(r.storage_ok ? "✓ Gespeichert – Ziel erreichbar" : "✓ Gespeichert – Ziel aktuell nicht erreichbar", !r.storage_ok);
-    refreshStatus();
+    fillSettings(r.settings);
+    settingsMsg(r.storage_ok ? "Gespeichert – Speicher-Ziel erreichbar" : "Gespeichert – Speicher-Ziel aktuell nicht erreichbar", !r.storage_ok);
+    toast("Einstellungen gespeichert", r.storage_ok ? "ok" : "warn");
+    refreshStatus(true); refreshBackups(true);
   } catch (e) {
-    settingsMsg("✗ " + e.message, true);
+    settingsMsg(e.message, true);
   } finally {
-    $("#saveBtn").disabled = false;
+    btn.classList.remove("loading"); btn.disabled = false;
   }
 }
 
-/* ---------- Init ---------- */
-refreshStatus(); refreshContainers(); refreshBackups(); refreshJobs(); loadSettings();
-setInterval(refreshStatus, 30000);
-setInterval(refreshContainers, 15000);
-setInterval(refreshBackups, 30000);
-setInterval(refreshJobs, 2000);
+/* ============================ Init ============================ */
+document.querySelectorAll(".nav-item").forEach(b =>
+  b.addEventListener("click", () => go(b.dataset.page)));
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    const m = $("#modalRoot .modal-bg.open");
+    if (m && m.__resolve) m.__resolve(false);
+  }
+});
+
+setInterval(() => {
+  if (document.hidden) return;
+  refreshJobs();
+  refreshStatus();
+  refreshContainers();
+  refreshBackups();
+}, 8000);
+
+setInterval(() => {
+  if (document.hidden) return;
+  if (state.page === "containers") renderContainers();
+  if (state.page === "backups") renderBackups();
+  if (state.page === "dashboard") renderDashboard();
+}, 30000);
+
+go("dashboard");
+refreshAll(true);
+loadSettings().catch(() => {});
 </script>
 </body>
 </html>

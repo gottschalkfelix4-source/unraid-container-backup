@@ -25,6 +25,10 @@ def main():
 
     sub.add_parser("list", help="Listet alle verfügbaren Backups im Speicherziel")
 
+    d = sub.add_parser("delete", help="Löscht ein einzelnes Backup")
+    d.add_argument("container", help="Container-Name")
+    d.add_argument("backup-id", help="Backup-Dateiname (siehe 'list')")
+
     args = p.parse_args()
     cfg = Config()
     cfg.validate()
@@ -32,10 +36,13 @@ def main():
     log = lambda m: print(m, flush=True)
 
     if args.cmd == "status":
-        print(f"Typ:      {cfg.backup_type}")
-        print(f"Ziel:     {cfg.remote_base}")
-        print(f"Plan:     {cfg.schedule} (UTC)")
-        print(f"Behalten: {cfg.keep or 'alle'}")
+        print(f"Typ:        {cfg.backup_type}")
+        print(f"Ziel:       {cfg.remote_base}")
+        print(f"Plan:       {cfg.schedule} (UTC)")
+        print(f"Behalten:   {cfg.keep or 'alle'}")
+        print(f"Parallel:   {cfg.parallel}")
+        print(f"Limit:      {cfg.bwlimit or 'unbegrenzt'}")
+        print(f"Verifizier: {'an' if cfg.verify_upload else 'aus'}")
         print(f"Erreichbar: {storage.test()}")
     elif args.cmd == "backup":
         client = get_client(cfg.docker_host)
@@ -43,7 +50,8 @@ def main():
             results = backup_mod.backup_all(cfg, client, storage, log=log)
         else:
             results = [
-                backup_mod.backup_container(client, cfg, storage, n, log=log) for n in args.container
+                backup_mod.backup_container(client, cfg, storage, n, log=log)
+                for n in args.container
             ]
         print(json.dumps(results, indent=2))
     elif args.cmd == "restore":
@@ -54,6 +62,9 @@ def main():
         print(json.dumps(result, indent=2))
     elif args.cmd == "list":
         print(json.dumps(restore_mod.available_backups(storage), indent=2))
+    elif args.cmd == "delete":
+        storage.delete_backup(args.container, args.backup_id)
+        print(f"Backup '{args.backup_id}' von '{args.container}' gelöscht")
 
 
 if __name__ == "__main__":
