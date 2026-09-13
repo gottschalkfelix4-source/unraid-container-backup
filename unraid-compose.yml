@@ -1,0 +1,43 @@
+# Beispiel-Compose für Unraid (Compose Manager) oder Docker-CLI.
+# Für die GUI-Eintragung siehe README.md (Abschnitt "Installation").
+services:
+  container-backup:
+    image: unraid-container-backup:latest
+    container_name: container-backup
+    ports:
+      - "8080:8080"
+    volumes:
+      # Docker-API (erfordert Root-Rechte auf dem Host)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Container-Daten (Unraid-Shares) – rw nötig für Restore
+      - /mnt/user:/mnt/user
+      # Unraid-Templates (Community Apps)
+      - /boot/config:/boot/config
+      # Benannte Docker-Volumes
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      # rclone-Konfiguration (optional persistent)
+      - /mnt/user/appdata/container-backup:/config
+    environment:
+      # --- Ziel wählen: smb ODER s3 ---
+      - BACKUP_TYPE=smb
+      # SMB
+      - SMB_HOST=192.168.178.100
+      - SMB_PORT=445
+      - SMB_USER=backup
+      - SMB_PASS=geheim
+      - SMB_SHARE=backup
+      - SMB_PATH=unraid-containers
+      # S3 (bei BACKUP_TYPE=s3)
+      # - S3_PROVIDER=AWS            # AWS, Minio, Garage, ...
+      # - S3_ENDPOINT=https://s3.meine-domain.de
+      # - S3_REGION=eu-central-1
+      # - S3_BUCKET=unraid-backups
+      # - S3_ACCESS_KEY=AKIA...
+      # - S3_SECRET_KEY=...
+      # - S3_PATH=unraid-containers
+      # --- Verhalten ---
+      - BACKUP_SCHEDULE=0 3 * * *   # täglich 03:00 UTC
+      - BACKUP_KEEP=7               # 7 Backups pro Container behalten (0 = alle)
+      - WEB_PORT=8080
+      - EXCLUDE_CONTAINERS=container-backup
+    restart: unless-stopped

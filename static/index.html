@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unraid Container Backup</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2129; --panel2: #212a35; --border: #2d3844;
+    --text: #e6edf3; --muted: #8b98a5; --accent: #4da3ff; --green: #3fb950;
+    --red: #f85149; --yellow: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, "Segoe UI", Roboto, sans-serif; padding: 24px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .statusbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .pill { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; color: var(--muted); }
+  .pill b { color: var(--text); font-weight: 600; }
+  .pill.ok b { color: var(--green); }
+  .pill.err b { color: var(--red); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 18px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 10px 18px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--panel2); }
+  .state { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
+  .state.running { background: var(--green); }
+  .state.exited, .state.dead { background: var(--red); }
+  .state.paused { background: var(--yellow); }
+  button { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 500; }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: var(--panel2); border: 1px solid var(--border); }
+  button.danger { background: var(--red); }
+  .empty { padding: 24px 18px; color: var(--muted); font-size: 13px; }
+  .jobs { max-height: 260px; overflow-y: auto; }
+  .job { padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .job:last-child { border-bottom: none; }
+  .job-title { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .job-status { font-size: 12px; }
+  .job-status.running { color: var(--yellow); }
+  .job-status.done { color: var(--green); }
+  .job-status.error { color: var(--red); }
+  .job-log { background: #0d1117; border-radius: 6px; padding: 10px; font-family: ui-monospace, monospace; font-size: 11px; color: #9fb0c0; max-height: 140px; overflow-y: auto; white-space: pre-wrap; margin-top: 6px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 440px; max-width: 92vw; }
+  .modal h3 { font-size: 16px; margin-bottom: 12px; }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+  .modal .warn { color: var(--yellow); }
+  .modal label { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 12px 0; cursor: pointer; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 12px 18px; font-size: 13px; z-index: 20; display: none; max-width: 380px; }
+  .toast.err { border-left-color: var(--red); }
+  .toast.show { display: block; }
+  code { background: #0d1117; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>Unraid Container Backup</h1>
+  <div class="sub">Docker-Container sichern &amp; mit einem Klick wiederherstellen (Daten + Template + Container)</div>
+
+  <div class="statusbar" id="statusbar">
+    <div class="pill">Lade Status ...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Container</h2>
+      <button onclick="backupAll()">Alle jetzt sichern</button>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Image</th><th>Status</th><th>Letztes Backup</th><th></th></tr></thead>
+      <tbody id="containerRows"><tr><td colspan="5" class="empty">Lade ...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Verfügbare Backups im Speicherziel</h2></div>
+    <table>
+      <thead><tr><th>Container</th><th>Backup</th><th>Größe</th><th>Datum</th><th></th></tr></thead>
+      <tbody id="backupRows"><tr><td colspan="5" class="empty">Lade ...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Aufgaben</h2></div>
+    <div class="jobs" id="jobs"><div class="empty">Keine Aufgaben</div></div>
+  </div>
+
+  <div class="modal-bg" id="restoreModal">
+    <div class="modal">
+      <h3>Container wiederherstellen</h3>
+      <p id="restoreInfo"></p>
+      <p class="warn">Achtung: Vorhandene Daten an den Originalpfaden werden überschrieben.</p>
+      <label><input type="checkbox" id="overwriteChk"> Bestehenden Container ersetzen und Daten überschreiben</label>
+      <div class="modal-actions">
+        <button class="secondary" onclick="closeModal()">Abbrechen</button>
+        <button class="danger" onclick="confirmRestore()">Wiederherstellen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let restoreTarget = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
+function fmtSize(b) {
+  if (!b) return "-";
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(b >= 10 || i === 0 ? 0 : 1) + " " + u[i];
+}
+
+function fmtDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString("de-DE");
+}
+
+function toast(msg, isErr) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  setTimeout(() => t.className = "toast", 5000);
+}
+
+async function refreshStatus() {
+  try {
+    const s = await api("/api/status");
+    $("#statusbar").innerHTML =
+      `<div class="pill ${s.storage_ok ? "ok" : "err"}">Ziel: <b>${s.storage_type.toUpperCase()}</b> ${s.storage_ok ? "✓ erreichbar" : "✗ nicht erreichbar"}</div>` +
+      `<div class="pill">Pfad: <b>${s.remote}</b></div>` +
+      `<div class="pill">Plan: <b>${s.schedule}</b> (UTC)</div>` +
+      `<div class="pill">Behalten: <b>${s.keep || "alle"}</b></div>`;
+  } catch (e) {
+    $("#statusbar").innerHTML = `<div class="pill err">API-Fehler: <b>${e.message}</b></div>`;
+  }
+}
+
+async function refreshContainers() {
+  try {
+    const list = await api("/api/containers");
+    const tb = $("#containerRows");
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">Keine Container gefunden</td></tr>'; return; }
+    tb.innerHTML = list.map(c => `
+      <tr>
+        <td><span class="state ${c.state}"></span>${c.name}</td>
+        <td><code>${c.image}</code></td>
+        <td>${c.state}</td>
+        <td>${c.last_backup ? c.last_backup : '<span style="color:var(--muted)">noch keins</span>'}</td>
+        <td><button class="secondary" onclick="backupOne('${c.name}')">Sichern</button></td>
+      </tr>`).join("");
+  } catch (e) {
+    $("#containerRows").innerHTML = `<tr><td colspan="5" class="empty">${e.message}</td></tr>`;
+  }
+}
+
+async function refreshBackups() {
+  try {
+    const list = await api("/api/backups");
+    const rows = [];
+    for (const entry of list) {
+      for (const b of entry.backups.slice().reverse()) {
+        rows.push(`<tr>
+          <td>${entry.container}</td>
+          <td><code>${b.id}</code></td>
+          <td>${fmtSize(b.size)}</td>
+          <td>${fmtDate(b.mtime)}</td>
+          <td><button onclick="openRestore('${entry.container}','${b.id}')">Wiederherstellen</button></td>
+        </tr>`);
+      }
+    }
+    $("#backupRows").innerHTML = rows.length ? rows.join("") : '<tr><td colspan="5" class="empty">Noch keine Backups vorhanden</td></tr>';
+  } catch (e) {
+    $("#backupRows").innerHTML = `<tr><td colspan="5" class="empty">${e.message}</td></tr>`;
+  }
+}
+
+async function refreshJobs() {
+  try {
+    const jobs = await api("/api/jobs");
+    const el = $("#jobs");
+    if (!jobs.length) { el.innerHTML = '<div class="empty">Keine Aufgaben</div>'; return; }
+    el.innerHTML = jobs.map(j => `
+      <div class="job">
+        <div class="job-title">
+          <span>${j.title}</span>
+          <span class="job-status ${j.status}">${j.status === "running" ? "läuft ..." : j.status === "done" ? "fertig" : "Fehler"}</span>
+        </div>
+        ${j.error ? `<div class="job-log" style="color:var(--red)">${j.error}</div>` : ""}
+        ${j.log && j.log.length ? `<div class="job-log">${j.log.slice(-40).join("\n")}</div>` : ""}
+      </div>`).join("");
+  } catch (e) {}
+}
+
+async function backupAll() {
+  try {
+    await api("/api/backup", { method: "POST", body: JSON.stringify({ all: true }) });
+    toast("Backup gestartet");
+    refreshJobs();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function backupOne(name) {
+  try {
+    await api("/api/backup", { method: "POST", body: JSON.stringify({ containers: [name] }) });
+    toast(`Backup von '${name}' gestartet`);
+    refreshJobs();
+  } catch (e) { toast(e.message, true); }
+}
+
+function openRestore(container, backupId) {
+  restoreTarget = { container, backupId };
+  $("#restoreInfo").innerHTML = `Container <b>${container}</b><br>Backup: <code>${backupId}</code><br><br>Es werden wiederhergestellt:<br>• Daten an den Originalpfaden<br>• Unraid-Template (Community Apps)<br>• Container (Image, Ports, Env, Netzwerk, Restart-Policy)`;
+  $("#overwriteChk").checked = false;
+  $("#restoreModal").classList.add("open");
+}
+
+function closeModal() { $("#restoreModal").classList.remove("open"); restoreTarget = null; }
+
+async function confirmRestore() {
+  if (!restoreTarget) return;
+  const { container, backupId } = restoreTarget;
+  const overwrite = $("#overwriteChk").checked;
+  closeModal();
+  try {
+    await api("/api/restore", { method: "POST", body: JSON.stringify({ container, backup_id: backupId, overwrite }) });
+    toast(`Wiederherstellung von '${container}' gestartet`);
+    refreshJobs();
+  } catch (e) { toast(e.message, true); }
+}
+
+refreshStatus(); refreshContainers(); refreshBackups(); refreshJobs();
+setInterval(refreshStatus, 30000);
+setInterval(refreshContainers, 15000);
+setInterval(refreshBackups, 30000);
+setInterval(refreshJobs, 2000);
+</script>
+</body>
+</html>
