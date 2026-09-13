@@ -92,6 +92,17 @@
   .foot-pill .dot.warn { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
   .foot-version { font-size: 10.5px; color: var(--muted); padding: 8px 10px 0; }
 
+  .setup-banner {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: linear-gradient(135deg, rgba(56,189,248,.1), rgba(99,102,241,.08));
+    border: 1px solid rgba(56,189,248,.3); border-radius: var(--radius);
+    padding: 16px 18px; margin-bottom: 18px;
+  }
+  .setup-banner .icon { width: 22px; height: 22px; color: var(--accent); flex: none; }
+  .setup-banner b { font-size: 14px; display: block; }
+  .setup-banner p { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  .setup-banner .btn { margin-left: auto; }
+
   .main { padding: 26px 30px 60px; max-width: 1280px; width: 100%; margin: 0 auto; }
   .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
   .topbar h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
@@ -561,6 +572,7 @@
 
     <!-- ============ Seite: Übersicht ============ -->
     <section id="page-dashboard" class="page">
+      <div id="dashSetup"></div>
       <div class="stat-grid" id="dashStats"></div>
       <div class="card" style="margin-top:18px;">
         <div class="card-head">
@@ -1090,6 +1102,17 @@ function renderDashboard() {
   const nextRun = s.next_run ? new Date(s.next_run) : null;
   const lastTs = st.last_backup_ts ? new Date(st.last_backup_ts).getTime() : null;
   const storageOk = s.storage_ok;
+
+  const setupHint = (!storageOk && !st.backups) ? `
+    <div class="setup-banner">
+      ${icon("settings")}
+      <div>
+        <b>Noch kein Speicher-Ziel konfiguriert</b>
+        <p>Richte in den Einstellungen dein Backup-Ziel ein (SMB-Share oder S3). DockGuard verbindet sich direkt aus dem Container – ohne Mounts oder Einrichtung auf dem Unraid-Host.</p>
+      </div>
+      <button class="btn primary" onclick="go('settings')">Jetzt einrichten</button>
+    </div>` : "";
+  $("#dashSetup").innerHTML = setupHint;
 
   const cards = [
     { ico: "box", label: "Container gesichert", val: String(st.containers ?? "–"),

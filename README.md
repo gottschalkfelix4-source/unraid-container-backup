@@ -65,28 +65,52 @@ Auf dem Unraid-Host (oder einem anderen Docker-Host):
 # oder: docker build -t dockguard:latest .
 ```
 
-### 2. Unraid-Template (Community Apps)
+### 2. Unraid-Template (Community Apps) – Minimal-Setup
 
-Das fertige Template liegt unter [`template/dockguard.xml`](template/dockguard.xml) – es enthält bereits alle Felder (Ziel, Zeitplan, Ausschlüsse, Login) und das **DockGuard-Icon**, das Unraid auch als Container-Icon verwendet.
+Das fertige Template liegt unter [`template/dockguard.xml`](template/dockguard.xml). Es ist bewusst **minimal gehalten** – nur zwei Einstellungen sind sichtbar:
 
-**Option A – Community Apps:** Template-Datei nach `/boot/config/plugins/dockerMan/templates-user/` kopieren. In der Docker-UI („Add Container“) erscheint die Vorlage **dockguard** mit Icon und allen Einstellungen.
+| Einstellung | Wert |
+|---|---|
+| **Web-UI Port** | `8080` |
+| **AppData-Verzeichnis** | `/mnt/user/appdata/dockguard` |
 
-**Option B – Manuell:**
+Alles Weitere – Speicher-Ziel (SMB/S3), Zugangsdaten, Zeitplan, Aufbewahrung, Ausschlüsse, Login – wird **in der Web-UI** konfiguriert und in `/config/settings.json` gespeichert.
+
+**Setup in 3 Minuten:**
+1. `template/dockguard.xml` nach `/boot/config/plugins/dockerMan/templates-user/` kopieren
+2. In der Docker-UI („Add Container“) die Vorlage **dockguard** wählen – Port und AppData sind bereits passend vorbelegt, Container starten
+3. Web-UI unter `http://<unraid-ip>:8080` öffnen und im Dashboard auf **„Jetzt einrichten“** klicken – Ziel eintragen, **„Verbindung testen“**, speichern, fertig
+
+> **Advanced-Ansicht:** In der Template-Advanced-Ansicht liegen die (mit passenden
+> Defaults vorbelegten) Pfade für Docker-Socket, `/mnt/user`, `/boot/config` und
+> `/var/lib/docker/volumes` – sie sind für Backup/Restore erforderlich und müssen
+> normalerweise nicht angefasst werden.
+
+> **Kein Host-Setup nötig:** Das Speicher-Ziel wird **direkt aus dem Container
+> heraus** erreicht – DockGuard spricht SMB und S3 selbst über rclone. Es gibt
+> keinen SMB-Mount, keine Credentials oder rclone-Einrichtung auf dem
+> Unraid-Host.
+
+**Option B – Manuell (Docker-CLI / Compose):**
 
 | Feld | Wert |
 |---|---|
 | Repository | `dockguard:latest` |
 | Container-Name | `dockguard` |
 | Host-Port | `8080` → Container-Port `8080` |
-| Volume 1 | `/var/run/docker.sock` → `/var/run/docker.sock` |
-| Volume 2 | `/mnt/user` → `/mnt/user` |
-| Volume 3 | `/boot/config` → `/boot/config` |
-| Volume 4 | `/var/lib/docker/volumes` → `/var/lib/docker/volumes` |
-| Volume 5 | `/mnt/user/appdata/dockguard` → `/config` |
+| Volume `/config` | `/mnt/user/appdata/dockguard` |
+| Volume `/var/run/docker.sock` | `/var/run/docker.sock` (ro) |
+| Volume `/mnt/user` | `/mnt/user` |
+| Volume `/boot/config` | `/boot/config` |
+| Volume `/var/lib/docker/volumes` | `/var/lib/docker/volumes` |
+
+Oder direkt [`unraid-compose.yml`](unraid-compose.yml) verwenden.
 
 > **Wichtig:** Das Tool braucht Zugriff auf den Docker-Socket (= Root-Rechte auf dem Host) sowie Schreibzugriff auf `/mnt/user`, `/boot/config` und `/var/lib/docker/volumes` für den Restore.
 
-### 3. Konfiguration (Umgebungsvariablen)
+### 3. Konfiguration
+
+**Primär über die Web-UI** (wird in `/config/settings.json` gespeichert und überschreibt die Umgebungsvariablen). Die Env-Variablen unten sind optional und dienen nur als Defaults für den Erststart – im Minimal-Setup wird keine einzige gesetzt, der Container startet unkonfiguriert und alles wird über die UI eingegeben.
 
 | Variable | Standard | Beschreibung |
 |---|---|---|

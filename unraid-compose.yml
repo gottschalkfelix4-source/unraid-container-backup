@@ -1,5 +1,9 @@
 # DockGuard – Beispiel-Compose für Unraid (Compose Manager) oder Docker-CLI.
-# Für die GUI-Eintragung siehe README.md (Abschnitt "Installation").
+# Minimal-Setup: Alle Einstellungen (Ziel SMB/S3, Zeitplan, Aufbewahrung,
+# Ausschlüsse, Login) erfolgen in der Web-UI und werden in /config/settings.json
+# gespeichert. Die unten auskommentierten Env-Werte dienen nur als optionale
+# Defaults für den Erststart.
+# Alternativ: Unraid-Template template/dockguard.xml verwenden.
 services:
   dockguard:
     image: dockguard:latest
@@ -7,43 +11,23 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Docker-API (erfordert Root-Rechte auf dem Host)
+      # Docker-API (erfolgt in der Web-UI) – erforderlich
       - /var/run/docker.sock:/var/run/docker.sock
-      # Container-Daten (Unraid-Shares) – rw nötig für Restore
-      - /mnt/user:/mnt/user
-      # Unraid-Templates (Community Apps)
-      - /boot/config:/boot/config
-      # Benannte Docker-Volumes
-      - /var/lib/docker/volumes:/var/lib/docker/volumes
-      # Einstellungen + rclone-Konfiguration (persistent)
+      # Einstellungen + rclone-Konfiguration – erforderlich
       - /mnt/user/appdata/dockguard:/config
-    environment:
-      # --- Ziel wählen: smb ODER s3 ---
-      - BACKUP_TYPE=smb
-      # SMB
-      - SMB_HOST=192.168.178.100
-      - SMB_PORT=445
-      - SMB_USER=backup
-      - SMB_PASS=geheim
-      - SMB_SHARE=backup
-      - SMB_PATH=unraid-containers
-      # S3 (bei BACKUP_TYPE=s3)
-      # - S3_PROVIDER=AWS            # AWS, Minio, Garage, ...
-      # - S3_ENDPOINT=https://s3.meine-domain.de
-      # - S3_REGION=eu-central-1
-      # - S3_BUCKET=unraid-backups
-      # - S3_ACCESS_KEY=AKIA...
-      # - S3_SECRET_KEY=...
-      # - S3_PATH=unraid-containers
-      # --- Verhalten ---
-      - BACKUP_SCHEDULE=0 3 * * *   # täglich 03:00 UTC
-      - BACKUP_KEEP=7               # 7 Backups pro Container behalten (0 = alle)
-      - BACKUP_PARALLEL=2           # Container gleichzeitig sichern (1-16)
-      - EXCLUDE_CONTAINERS=dockguard
-      # - EXCLUDE_MOUNTS=/cache, /transcode   # Mounts ausschließen (Quelle/Ziel enthält Ausdruck)
-      # - RCLONE_BWLIMIT=8M          # Upload-Limit, leer = unbegrenzt
-      # - VERIFY_UPLOAD=1            # Größencheck nach Upload (0 = aus)
-      # --- Sicherheit (optional) ---
-      # - WEB_USER=admin
-      # - WEB_PASSWORD=meinpasswort
+      # Nur für One-Click-Restore erforderlich (Daten/Template/Volumes zurückschreiben)
+      - /mnt/user:/mnt/user
+      - /boot/config:/boot/config
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    # environment:
+    #   --- Optionale Defaults (ersetzt alles in der Web-UI) ---
+    #   - BACKUP_SCHEDULE=0 3 * * *
+    #   - BACKUP_KEEP=7
+    #   - BACKUP_PARALLEL=2
+    #   - EXCLUDE_CONTAINERS=dockguard
+    #   - RCLONE_BWLIMIT=8M
+    #   - VERIFY_UPLOAD=1
+    #   --- Optionaler Login für die Web-UI ---
+    #   - WEB_USER=admin
+    #   - WEB_PASSWORD=meinpasswort
     restart: unless-stopped
