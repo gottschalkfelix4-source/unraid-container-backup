@@ -24,12 +24,12 @@ ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über
   <Nice>0</Nice>
 
   <!-- ============ Grundeinstellungen (immer sichtbar) ============ -->
-  <Config Name="Web-UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port der Weboberfläche – Rest erfolgt in der Web-UI" Type="Port" Display="always" Required="true" Mask="false"/>
+  <Config Name="Web-UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port der Weboberfläche – alle weiteren Einstellungen erfolgen in der Web-UI" Type="Port" Display="always" Required="true" Mask="false"/>
   <Config Name="AppData-Verzeichnis" Target="/config" Default="/mnt/user/appdata/dockguard" Mode="rw" Description="Persistente Ablage für Einstellungen (settings.json) und rclone-Konfiguration" Type="Path" Display="always" Required="true" Mask="false"/>
 
   <!-- ============ Erweitert (Advanced-Ansicht, Defaults passen) ============ -->
   <Config Name="Docker-Socket (erforderlich)" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Docker-API – notwendig für Backup/Restore (erfordert Root-Zugriff)" Type="Path" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="User-Daten (/mnt/user)" Target="/mnt/user" Default="/mnt/user" Mode="rw" Description="Container-Daten und Unraid-Shares – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Boot-Config (/boot/config)" Target="/boot/config" Default="/boot/config" Mode="rw" Description="Unraid-Templates aus plugins/dockerMan/templates-user – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Docker-Volumes (/var/lib/docker/volumes)" Target="/var/lib/docker/volumes" Default="/var/lib/docker/volumes" Mode="rw" Description="Benannte Volumes – nur fuer Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="User-Daten (/mnt/user)" Target="/mnt/user" Default="/mnt/user" Mode="rw" Description="Container-Daten und Unraid-Shares – nur für Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Boot-Config (/boot/config)" Target="/boot/config" Default="/boot/config" Mode="rw" Description="Unraid-Templates aus plugins/dockerMan/templates-user – nur für Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Docker-Volumes (/var/lib/docker/volumes)" Target="/var/lib/docker/volumes" Default="/var/lib/docker/volumes" Mode="rw" Description="Benannte Volumes – nur für Restore beschreibbar" Type="Path" Display="advanced" Required="false" Mask="false"/>
 </Container>

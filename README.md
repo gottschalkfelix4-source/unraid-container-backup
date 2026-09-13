@@ -77,7 +77,20 @@ Das fertige Template liegt unter [`template/dockguard.xml`](template/dockguard.x
 Alles Weitere – Speicher-Ziel (SMB/S3), Zugangsdaten, Zeitplan, Aufbewahrung, Ausschlüsse, Login – wird **in der Web-UI** konfiguriert und in `/config/settings.json` gespeichert.
 
 **Setup in 3 Minuten:**
-1. `template/dockguard.xml` nach `/boot/config/plugins/dockerMan/templates-user/` kopieren
+
+1. **Template auf dem Server anlegen** – direkt im Unraid-Terminal (oder per SSH) ausführen; der Zielordner liegt auf dem USB-Stick und übersteht Reboots:
+
+   ```bash
+   # Variante A – die Projekt-/Repo-Datei liegt auf dem Server (git clone oder Samba):
+   cp template/dockguard.xml /boot/config/plugins/dockerMan/templates-user/
+
+   # Variante B – direkt von GitHub herunterladen (funktioniert, sobald das Repo
+   # öffentlich ist; bei privatem Repo Variante A nutzen oder ein GitHub-Token anhängen:
+   # curl -fsSL -H "Authorization: Bearer <token>" -o ...):
+   curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/dockguard.xml \
+     https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml
+   ```
+
 2. In der Docker-UI („Add Container“) die Vorlage **dockguard** wählen – Port und AppData sind bereits passend vorbelegt, Container starten
 3. Web-UI unter `http://<unraid-ip>:8080` öffnen und im Dashboard auf **„Jetzt einrichten“** klicken – Ziel eintragen, **„Verbindung testen“**, speichern, fertig
 
