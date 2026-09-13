@@ -62,6 +62,7 @@ Auf dem Unraid-Host (oder einem anderen Docker-Host):
 
 | Variable | Standard | Beschreibung |
 |---|---|---|
+| `SETTINGS_FILE` | `/config/settings.json` | Pfad der Einstellungsdatei (Web-UI) |
 | `BACKUP_TYPE` | `smb` | `smb` oder `s3` |
 | `SMB_HOST` | – | IP/Hostname des Zielservers |
 | `SMB_PORT` | `445` | SMB-Port |
@@ -89,7 +90,10 @@ Nach dem Start unter `http://<unraid-ip>:8080`:
 
 - **Container** – alle Container mit letztem Backup, Button „Sichern“ bzw. „Alle jetzt sichern“
 - **Verfügbare Backups** – alle Backups im Speicherziel; Button **„Wiederherstellen“** = der One-Click-Restore (auch für komplett gelöschte Container)
+- **Einstellungen** – alle Einstellungen direkt in der UI ändern (Ziel SMB/S3 inkl. Zugangsdaten, Zeitplan, Retention, ausgeschlossene Container, Template-Pfade, Timeout). Mit **„Verbindung testen“** lässt sich das Ziel vor dem Speichern prüfen; gespeichert wird in `/config/settings.json`
 - **Aufgaben** – Live-Log aller laufenden/letzten Jobs
+
+> **Priorität:** Werte aus der Web-UI (settings.json) überschreiben die Umgebungsvariablen. Die Env-Vars dienen als Defaults beim ersten Start – der Container startet auch ohne Konfiguration, dann einfach alles über die UI eintragen.
 
 ### CLI
 

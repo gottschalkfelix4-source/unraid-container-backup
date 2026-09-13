@@ -20,7 +20,7 @@
   .pill.ok b { color: var(--green); }
   .pill.err b { color: var(--red); }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; overflow: hidden; }
-  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
   .card-head h2 { font-size: 15px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; padding: 10px 18px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
@@ -54,10 +54,26 @@
   .modal .warn { color: var(--yellow); }
   .modal label { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 12px 0; cursor: pointer; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
-  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 12px 18px; font-size: 13px; z-index: 20; display: none; max-width: 380px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 12px 18px; font-size: 13px; z-index: 20; display: none; max-width: 420px; }
   .toast.err { border-left-color: var(--red); }
   .toast.show { display: block; }
   code { background: #0d1117; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  /* Einstellungen */
+  .settings-body { padding: 18px; }
+  .field-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field label .req { color: var(--red); }
+  .field input, .field select { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 13px; width: 100%; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .section-title:first-child { margin-top: 0; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .hidden { display: none !important; }
+  .settings-actions { display: flex; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+  .settings-msg { font-size: 13px; }
+  .settings-msg.ok { color: var(--green); }
+  .settings-msg.err { color: var(--red); }
 </style>
 </head>
 <body>
@@ -88,6 +104,97 @@
   </div>
 
   <div class="card">
+    <div class="card-head"><h2>Einstellungen</h2></div>
+    <div class="settings-body">
+      <div class="section-title">Backup-Ziel</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Typ</label>
+          <select id="backup_type" onchange="toggleTarget()">
+            <option value="smb">SMB-Share</option>
+            <option value="s3">S3-Storage</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="smbGroup">
+        <div class="section-title">SMB-Verbindung</div>
+        <div class="field-row">
+          <div class="field"><label>Host / IP <span class="req">*</span></label><input id="smb_host" placeholder="192.168.178.100"></div>
+          <div class="field"><label>Port</label><input id="smb_port" type="number" value="445"></div>
+          <div class="field"><label>Benutzer <span class="req">*</span></label><input id="smb_user"></div>
+          <div class="field"><label>Passwort <span class="req">*</span></label><input id="smb_pass" type="password" placeholder="••••••••"></div>
+          <div class="field"><label>Share <span class="req">*</span></label><input id="smb_share" placeholder="backup"></div>
+          <div class="field"><label>Unterverzeichnis</label><input id="smb_path" placeholder="unraid-containers"></div>
+        </div>
+      </div>
+
+      <div id="s3Group" class="hidden">
+        <div class="section-title">S3-Verbindung</div>
+        <div class="field-row">
+          <div class="field"><label>Provider</label>
+            <select id="s3_provider">
+              <option value="AWS">AWS</option>
+              <option value="Minio">Minio</option>
+              <option value="Garage">Garage</option>
+              <option value="Ceph">Ceph</option>
+              <option value="DigitalOcean">DigitalOcean</option>
+              <option value="Other">Anderer (rclone)</option>
+            </select>
+          </div>
+          <div class="field"><label>Endpoint</label><input id="s3_endpoint" placeholder="https://s3.meine-domain.de (bei AWS leer)"></div>
+          <div class="field"><label>Region</label><input id="s3_region" value="us-east-1"></div>
+          <div class="field"><label>Bucket <span class="req">*</span></label><input id="s3_bucket"></div>
+          <div class="field"><label>Access Key <span class="req">*</span></label><input id="s3_access_key"></div>
+          <div class="field"><label>Secret Key <span class="req">*</span></label><input id="s3_secret_key" type="password" placeholder="••••••••"></div>
+          <div class="field"><label>Unterverzeichnis</label><input id="s3_path" placeholder="unraid-containers"></div>
+        </div>
+      </div>
+
+      <div class="section-title">Verhalten</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Zeitplan (Cron, UTC)</label>
+          <input id="schedule" placeholder="0 3 * * *">
+          <div class="hint">z. B. <code>0 3 * * *</code> täglich 03:00 · <code>0 */6 * * *</code> alle 6 h · <code>0 2 * * 0</code> sonntags 02:00</div>
+        </div>
+        <div class="field">
+          <label>Backups pro Container behalten</label>
+          <input id="keep" type="number" min="0" value="0">
+          <div class="hint">0 = alle behalten</div>
+        </div>
+        <div class="field">
+          <label>Web-Port</label>
+          <input id="web_port" type="number" min="1" max="65535">
+          <div class="hint">wirkt erst nach Neustart des Containers</div>
+        </div>
+        <div class="field">
+          <label>rclone-Timeout (Sekunden)</label>
+          <input id="rclone_timeout" type="number" min="30" value="7200">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Ausgeschlossene Container</label>
+          <input id="exclude" placeholder="container-backup">
+          <div class="hint">kommagetrennte Namen, die nicht gesichert werden</div>
+        </div>
+        <div class="field">
+          <label>Template-Verzeichnis(e)</label>
+          <input id="templates_dir" placeholder="/boot/config/plugins/dockerMan/templates-user">
+          <div class="hint">mehrere kommagetrennt; Restore schreibt ins erste</div>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="secondary" id="testBtn" onclick="testConnection()">Verbindung testen</button>
+        <button id="saveBtn" onclick="saveSettings()">Speichern</button>
+        <span class="settings-msg" id="settingsMsg"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-head"><h2>Aufgaben</h2></div>
     <div class="jobs" id="jobs"><div class="empty">Keine Aufgaben</div></div>
   </div>
@@ -110,6 +217,15 @@
 <script>
 const $ = s => document.querySelector(s);
 let restoreTarget = null;
+
+const NUMERIC_FIELDS = ["smb_port", "keep", "web_port", "rclone_timeout"];
+const SETTINGS_FIELDS = [
+  "backup_type",
+  "smb_host", "smb_port", "smb_user", "smb_pass", "smb_share", "smb_path",
+  "s3_provider", "s3_endpoint", "s3_region", "s3_bucket",
+  "s3_access_key", "s3_secret_key", "s3_path",
+  "schedule", "keep", "web_port", "exclude", "templates_dir", "rclone_timeout",
+];
 
 async function api(path, opts = {}) {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
@@ -139,9 +255,16 @@ function toast(msg, isErr) {
   const t = $("#toast");
   t.textContent = msg;
   t.className = "toast show" + (isErr ? " err" : "");
-  setTimeout(() => t.className = "toast", 5000);
+  setTimeout(() => t.className = "toast", 6000);
 }
 
+function settingsMsg(text, isErr) {
+  const el = $("#settingsMsg");
+  el.textContent = text || "";
+  el.className = "settings-msg" + (isErr ? " err" : " ok");
+}
+
+/* ---------- Status ---------- */
 async function refreshStatus() {
   try {
     const s = await api("/api/status");
@@ -155,6 +278,7 @@ async function refreshStatus() {
   }
 }
 
+/* ---------- Container ---------- */
 async function refreshContainers() {
   try {
     const list = await api("/api/containers");
@@ -173,6 +297,7 @@ async function refreshContainers() {
   }
 }
 
+/* ---------- Backups ---------- */
 async function refreshBackups() {
   try {
     const list = await api("/api/backups");
@@ -194,6 +319,7 @@ async function refreshBackups() {
   }
 }
 
+/* ---------- Jobs ---------- */
 async function refreshJobs() {
   try {
     const jobs = await api("/api/jobs");
@@ -211,6 +337,7 @@ async function refreshJobs() {
   } catch (e) {}
 }
 
+/* ---------- Backup-Aktionen ---------- */
 async function backupAll() {
   try {
     await api("/api/backup", { method: "POST", body: JSON.stringify({ all: true }) });
@@ -227,6 +354,7 @@ async function backupOne(name) {
   } catch (e) { toast(e.message, true); }
 }
 
+/* ---------- Restore ---------- */
 function openRestore(container, backupId) {
   restoreTarget = { container, backupId };
   $("#restoreInfo").innerHTML = `Container <b>${container}</b><br>Backup: <code>${backupId}</code><br><br>Es werden wiederhergestellt:<br>• Daten an den Originalpfaden<br>• Unraid-Template (Community Apps)<br>• Container (Image, Ports, Env, Netzwerk, Restart-Policy)`;
@@ -248,7 +376,70 @@ async function confirmRestore() {
   } catch (e) { toast(e.message, true); }
 }
 
-refreshStatus(); refreshContainers(); refreshBackups(); refreshJobs();
+/* ---------- Einstellungen ---------- */
+function toggleTarget() {
+  const type = $("#backup_type").value;
+  $("#smbGroup").classList.toggle("hidden", type !== "smb");
+  $("#s3Group").classList.toggle("hidden", type !== "s3");
+}
+
+function fillSettings(s) {
+  for (const f of SETTINGS_FIELDS) {
+    const el = $("#" + f);
+    if (el && s[f] !== undefined && s[f] !== null) el.value = s[f];
+  }
+  toggleTarget();
+}
+
+function collectSettings() {
+  const out = {};
+  for (const f of SETTINGS_FIELDS) {
+    const el = $("#" + f);
+    if (!el) continue;
+    let v = el.value.trim();
+    if (NUMERIC_FIELDS.includes(f)) v = v === "" ? "" : parseInt(v, 10);
+    out[f] = v;
+  }
+  return out;
+}
+
+async function loadSettings() {
+  try {
+    fillSettings(await api("/api/settings"));
+  } catch (e) {
+    settingsMsg("Einstellungen konnten nicht geladen werden: " + e.message, true);
+  }
+}
+
+async function testConnection() {
+  settingsMsg("Teste Verbindung ...");
+  $("#testBtn").disabled = true;
+  try {
+    const r = await api("/api/settings/test", { method: "POST", body: JSON.stringify(collectSettings()) });
+    settingsMsg(r.ok ? "✓ Verbindung erfolgreich" : "✗ Ziel nicht erreichbar – Werte prüfen", !r.ok);
+  } catch (e) {
+    settingsMsg("✗ " + e.message, true);
+  } finally {
+    $("#testBtn").disabled = false;
+  }
+}
+
+async function saveSettings() {
+  settingsMsg("Speichere ...");
+  $("#saveBtn").disabled = true;
+  try {
+    const r = await api("/api/settings", { method: "POST", body: JSON.stringify(collectSettings()) });
+    settingsMsg(r.storage_ok ? "✓ Gespeichert – Ziel erreichbar" : "✓ Gespeichert – Ziel aktuell nicht erreichbar", !r.storage_ok);
+    refreshStatus();
+  } catch (e) {
+    settingsMsg("✗ " + e.message, true);
+  } finally {
+    $("#saveBtn").disabled = false;
+  }
+}
+
+/* ---------- Init ---------- */
+refreshStatus(); refreshContainers(); refreshBackups(); refreshJobs(); loadSettings();
 setInterval(refreshStatus, 30000);
 setInterval(refreshContainers, 15000);
 setInterval(refreshBackups, 30000);

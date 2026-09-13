@@ -21,9 +21,11 @@ cfg = Config()
 try:
     cfg.validate()
 except ValueError as exc:
-    raise SystemExit(f"Konfigurationsfehler: {exc}")
+    # Nicht fatal: Die Web-UI kann die Einstellungen nachträglich vervollständigen.
+    print(f"ACHTUNG: Konfiguration unvollständig ({exc}). Bitte über die Web-UI eintragen.", flush=True)
 
 storage = Storage(cfg)
+scheduler = None
 app = FastAPI(title="Unraid Container Backup")
 
 
@@ -100,6 +102,7 @@ def _docker_client():
 
 @app.on_event("startup")
 def startup():
+    global scheduler
     ok = storage.test()
     print(f"Speicherziel: {cfg.remote_base} ({cfg.backup_type}) - erreichbar: {ok}", flush=True)
     try:
@@ -107,7 +110,22 @@ def startup():
         print("Docker-API verbunden", flush=True)
     except Exception as exc:
         print(f"ACHTUNG: Docker nicht erreichbar: {exc}", flush=True)
-    start_scheduler(cfg, storage, job_manager)
+    scheduler = start_scheduler(cfg, storage, job_manager)
+
+
+def _reschedule():
+    """Cron-Job nach Änderung des Zeitplans neu planen."""
+    if scheduler is None:
+        return
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+
+        scheduler.reschedule_job(
+            "scheduled-backup", trigger=CronTrigger.from_crontab(str(cfg.schedule))
+        )
+        print(f"Scheduler neu geplant: '{cfg.schedule}' (UTC)", flush=True)
+    except Exception as exc:
+        print(f"Scheduler konnte nicht neu geplant werden: {exc}", flush=True)
 
 
 @app.get("/")
@@ -124,6 +142,40 @@ def api_status():
         "schedule": cfg.schedule,
         "keep": cfg.keep,
     }
+
+
+@app.get("/api/settings")
+def api_settings_get():
+    d = cfg.to_dict()
+    d["storage_ok"] = storage.test()
+    d["remote"] = cfg.remote_base
+    return d
+
+
+@app.post("/api/settings")
+def api_settings_save(req: dict):
+    global storage
+    try:
+        cfg.update(req)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Speichern fehlgeschlagen: {exc}")
+    storage = Storage(cfg)
+    _reschedule()
+    return {"ok": True, "settings": cfg.to_dict(), "storage_ok": storage.test()}
+
+
+@app.post("/api/settings/test")
+def api_settings_test(req: dict):
+    """Testet die Verbindung mit den übergebenen Werten, ohne sie zu speichern."""
+    try:
+        tmp = Config.from_dict(req)
+        tmp.validate()
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    st = Storage(tmp)
+    return {"ok": st.test()}
 
 
 @app.get("/api/containers")
