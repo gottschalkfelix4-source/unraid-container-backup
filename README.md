@@ -80,29 +80,16 @@ Alles Weitere – Speicher-Ziel (SMB/S3), Zugangsdaten, Zeitplan, Aufbewahrung, 
 
 1. **Template auf dem Server anlegen** – einmalig im Unraid-Terminal (oder per SSH) ausführen. Der Zielordner liegt auf dem USB-Stick und übersteht Reboots.
 
-   **Weg 1 – Repo liegt auf dem Server (empfohlen, Copy-Paste):**
+   **Copy-Paste – ein Befehl, fertig:**
 
    ```bash
-   cd /mnt/user/appdata/unraid-container-backup    # <- Pfad zum geklonten Repo anpassen
-   mkdir -p /boot/config/plugins/dockerMan/templates-user
-   cp -v template/dockguard.xml /boot/config/plugins/dockerMan/templates-user/
+   mkdir -p /boot/config/plugins/dockerMan/templates-user && \
+     curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/dockguard.xml \
+       https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml
    ```
 
-   **Weg 2 – direkt von GitHub** (das Repo ist privat, daher mit Token):
-
-   ```bash
-   TOKEN=ghp_deinToken    # <- GitHub-Token mit "repo"-Recht (Settings -> Developer settings -> Personal access tokens)
-   curl -fsSL -H "Authorization: token $TOKEN" \
-     -o /boot/config/plugins/dockerMan/templates-user/dockguard.xml \
-     https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml
-   ```
-
-   Sobald das Repo öffentlich ist, genügt Weg 2 auch ohne Token:
-
-   ```bash
-   curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/dockguard.xml \
-     https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml
-   ```
+   > Liegt das Repo ohnehin auf dem Server, geht es genauso lokal:
+   > `cp template/dockguard.xml /boot/config/plugins/dockerMan/templates-user/`
 
    Danach erscheint die Vorlage sofort in der Docker-UI unter „Add Container“.
 
