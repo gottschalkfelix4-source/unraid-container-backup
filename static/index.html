@@ -6,1604 +6,456 @@
 <title>DockGuard – Unraid Container Backup</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="%2338bdf8"/><path d="M16 6l8 4v6.5c0 4.8-3.4 7.4-7.6 8.9a1.2 1.2 0 0 1-.8 0C11.4 23.9 8 21.3 8 16.5V10z" fill="white" opacity=".95"/><path d="M11.5 16l3.2 3.2 5.8-5.8" stroke="%2338bdf8" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'>
 <style>
-  /* ============ Design-Tokens ============ */
-  :root {
-    --bg: #080c12;
-    --bg-grad-1: rgba(56, 189, 248, .07);
-    --bg-grad-2: rgba(168, 85, 247, .05);
-    --panel: #101722;
-    --panel-2: #151f2d;
-    --panel-3: #1b2738;
-    --border: #1d2939;
-    --border-2: #2b3b52;
-    --text: #e6eef7;
-    --text-2: #a9bccd;
-    --muted: #6d8299;
-    --accent: #38bdf8;
-    --accent-2: #818cf8;
-    --accent-grad: linear-gradient(135deg, #38bdf8, #6366f1);
-    --accent-dim: rgba(56, 189, 248, .12);
-    --green: #34d399;
-    --green-dim: rgba(52, 211, 153, .12);
-    --yellow: #fbbf24;
-    --yellow-dim: rgba(251, 191, 36, .12);
-    --red: #f87171;
-    --red-dim: rgba(248, 113, 113, .12);
-    --purple: #a78bfa;
-    --radius: 14px;
-    --radius-sm: 9px;
-    --shadow: 0 12px 34px rgba(0, 0, 0, .4);
-    --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
-    --font: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
-  body {
-    background: var(--bg);
-    background-image:
-      radial-gradient(900px 500px at 85% -10%, var(--bg-grad-1), transparent 60%),
-      radial-gradient(800px 500px at -10% 110%, var(--bg-grad-2), transparent 60%);
-    background-attachment: fixed;
-    color: var(--text);
-    font-family: var(--font);
-    font-size: 14px;
-    -webkit-font-smoothing: antialiased;
-  }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: #243244; border-radius: 8px; border: 2px solid var(--bg); }
-  ::-webkit-scrollbar-thumb:hover { background: #2f4257; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  a { color: var(--accent); text-decoration: none; }
-  code, .mono { font-family: var(--mono); font-size: .92em; }
-
-  /* ============ Layout ============ */
-  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
-  .sidebar {
-    position: sticky; top: 0; height: 100vh;
-    display: flex; flex-direction: column;
-    background: rgba(12, 18, 28, .82);
-    backdrop-filter: blur(14px);
-    border-right: 1px solid var(--border);
-    padding: 20px 14px;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 20px; }
-  .brand-logo {
-    width: 38px; height: 38px; border-radius: 11px; flex: none;
-    background: var(--accent-grad);
-    display: grid; place-items: center; color: #fff;
-    box-shadow: 0 6px 18px rgba(56, 189, 248, .35);
-  }
-  .brand b { font-size: 14.5px; line-height: 1.2; display: block; }
-  .brand span { font-size: 11px; color: var(--muted); }
-  nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-  .nav-item {
-    display: flex; align-items: center; gap: 11px;
-    padding: 10px 12px; border-radius: 10px; border: 1px solid transparent;
-    color: var(--text-2); font-size: 13.5px; font-weight: 500;
-    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
-    background: none; text-align: left; width: 100%;
-  }
-  .nav-item:hover { background: var(--panel-2); color: var(--text); }
-  .nav-item.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(56,189,248,.25); }
-  .nav-item .badge { margin-left: auto; }
-  .sidebar-foot { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
-  .foot-pill { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); font-size: 12px; color: var(--muted); }
-  .foot-pill b { color: var(--text); font-weight: 600; }
-  .foot-pill .dot.warn { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
-  .foot-version { font-size: 10.5px; color: var(--muted); padding: 8px 10px 0; }
-
-  .setup-banner {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    background: linear-gradient(135deg, rgba(56,189,248,.1), rgba(99,102,241,.08));
-    border: 1px solid rgba(56,189,248,.3); border-radius: var(--radius);
-    padding: 16px 18px; margin-bottom: 18px;
-  }
-  .setup-banner .icon { width: 22px; height: 22px; color: var(--accent); flex: none; }
-  .setup-banner b { font-size: 14px; display: block; }
-  .setup-banner p { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
-  .setup-banner .btn { margin-left: auto; }
-
-  .main { padding: 26px 30px 60px; max-width: 1280px; width: 100%; margin: 0 auto; }
-  .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; }
-  .topbar h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
-  .topbar .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
-  .top-actions { display: flex; gap: 8px; }
-
-  .page { animation: pageIn .22s ease; }
-  @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
-  /* ============ Buttons & Badges ============ */
-  .btn {
-    display: inline-flex; align-items: center; gap: 7px;
-    border: 1px solid transparent; border-radius: 9px;
-    padding: 8px 14px; font-size: 13px; font-weight: 600;
-    cursor: pointer; transition: filter .15s, transform .05s, background .15s, border-color .15s;
-    font-family: inherit; white-space: nowrap;
-  }
-  .btn:active { transform: scale(.97); }
-  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
-  .btn.primary { background: var(--accent-grad); color: #fff; box-shadow: 0 4px 14px rgba(56,189,248,.28); }
-  .btn.primary:not(:disabled):hover { filter: brightness(1.12); }
-  .btn.secondary { background: var(--panel-2); border-color: var(--border-2); color: var(--text); }
-  .btn.secondary:not(:disabled):hover { background: var(--panel-3); }
-  .btn.danger { background: var(--red-dim); border-color: rgba(248,113,113,.35); color: var(--red); }
-  .btn.danger:not(:disabled):hover { background: rgba(248,113,113,.2); }
-  .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
-  .btn.ghost:not(:disabled):hover { background: var(--panel-2); color: var(--text); }
-  .btn.icon { padding: 8px; border-radius: 9px; }
-  .btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
-  .btn .icon, .icon { width: 16px; height: 16px; flex: none; }
-  .btn.icon-lge .icon { width: 18px; height: 18px; }
-  .btn.loading { position: relative; color: transparent !important; pointer-events: none; }
-  .btn.loading::after {
-    content: ""; position: absolute; inset: 0; margin: auto;
-    width: 15px; height: 15px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
-    animation: spin .7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 3px 10px; border-radius: 999px;
-    font-size: 11.5px; font-weight: 600; letter-spacing: .02em;
-    border: 1px solid var(--border-2); color: var(--text-2); background: var(--panel-2);
-  }
-  .badge.green { color: var(--green); background: var(--green-dim); border-color: rgba(52,211,153,.3); }
-  .badge.yellow { color: var(--yellow); background: var(--yellow-dim); border-color: rgba(251,191,36,.3); }
-  .badge.red { color: var(--red); background: var(--red-dim); border-color: rgba(248,113,113,.3); }
-  .badge.blue { color: var(--accent); background: var(--accent-dim); border-color: rgba(56,189,248,.3); }
-  .badge.gray { color: var(--muted); background: var(--panel-2); border-color: var(--border); }
-  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .badge.green .dot { background: var(--green); }
-  .badge.yellow .dot { background: var(--yellow); }
-  .badge.red .dot { background: var(--red); }
-  .badge.blue .dot { background: var(--accent); }
-  .badge.gray .dot { background: var(--muted); }
-
-  .dot {
-    width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none;
-    background: var(--muted);
-  }
-  .dot.run { background: var(--green); box-shadow: 0 0 0 0 rgba(52,211,153,.5); animation: pulse 2s infinite; }
-  .dot.warn { background: var(--yellow); }
-  .dot.stop { background: #556176; }
-  .dot.err { background: var(--red); }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(52,211,153,.45); }
-    70% { box-shadow: 0 0 0 7px rgba(52,211,153,0); }
-    100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
-  }
-
-  /* ============ Cards & Grids ============ */
-  .card {
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: var(--radius); margin-bottom: 18px;
-  }
-  .card-head {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-    padding: 15px 18px; border-bottom: 1px solid var(--border);
-  }
-  .card-head h2 { font-size: 15px; font-weight: 650; display: flex; align-items: center; gap: 9px; }
-  .card-head h2 .icon { color: var(--accent); }
-  .card-body { padding: 18px; }
-  .muted { color: var(--muted); }
-  .center { text-align: center; }
-
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
-  .stat-card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px 18px; position: relative; overflow: hidden;
-    transition: border-color .15s, transform .15s;
-  }
-  .stat-card:hover { border-color: var(--border-2); transform: translateY(-2px); }
-  .stat-card .stat-icon {
-    position: absolute; right: -8px; top: -8px; width: 64px; height: 64px; opacity: .07;
-  }
-  .stat-card .stat-icon .icon { width: 64px; height: 64px; }
-  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
-  .stat-val { font-size: 27px; font-weight: 750; letter-spacing: -.02em; margin: 7px 0 2px; }
-  .stat-sub { font-size: 12px; color: var(--muted); }
-  .stat-sub .inline-dot { margin-right: 5px; vertical-align: 1px; }
-
-  /* ============ Container-Karten ============ */
-  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-  .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
-  .search-wrap .icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 15px; height: 15px; pointer-events: none; }
-  .search-wrap input { width: 100%; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip {
-    padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
-    border: 1px solid var(--border-2); background: var(--panel-2); color: var(--text-2);
-    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .chip:hover { color: var(--text); }
-  .chip.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(56,189,248,.35); }
-  .chip .count { font-size: 11px; opacity: .75; }
-
-  .c-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-  .c-card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 15px 16px; display: flex; flex-direction: column; gap: 12px;
-    transition: border-color .15s, transform .15s, box-shadow .15s;
-  }
-  .c-card:hover { border-color: var(--border-2); transform: translateY(-2px); box-shadow: var(--shadow); }
-  .c-head { display: flex; align-items: flex-start; gap: 10px; }
-  .c-head .dot { margin-top: 5px; }
-  .c-title { flex: 1; min-width: 0; }
-  .c-title b { font-size: 14.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .c-image { font-size: 11.5px; color: var(--muted); font-family: var(--mono); display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .c-meta { display: flex; gap: 14px; flex-wrap: wrap; border-top: 1px dashed var(--border); padding-top: 10px; }
-  .c-meta-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
-  .c-meta-item .icon { width: 13px; height: 13px; }
-  .c-meta-item b { color: var(--text-2); font-weight: 600; }
-  .c-actions { display: flex; gap: 8px; }
-  .c-actions .btn { flex: 1; justify-content: center; }
-
-  /* ============ Backups ============ */
-  .b-group { margin-bottom: 12px; }
-  .b-group-head {
-    width: 100%; display: flex; align-items: center; gap: 11px;
-    background: var(--panel-2); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 12px 15px; cursor: pointer;
-    font-family: inherit; font-size: 13.5px; color: var(--text);
-    transition: border-color .15s, background .15s;
-  }
-  .b-group-head:hover { border-color: var(--border-2); background: var(--panel-3); }
-  .b-group-head .g-count { margin-left: auto; font-size: 11.5px; color: var(--muted); font-weight: 600; margin-right: 6px; }
-  .b-group-head .chev { transition: transform .18s; color: var(--muted); }
-  .b-group.open .b-group-head .chev { transform: rotate(180deg); }
-  .b-group-body { display: none; }
-  .b-group.open .b-group-body { display: block; margin-top: 8px; animation: pageIn .18s ease; }
-  table.data { width: 100%; border-collapse: collapse; }
-  table.data th {
-    text-align: left; padding: 9px 14px; color: var(--muted); font-size: 11px;
-    font-weight: 600; text-transform: uppercase; letter-spacing: .07em;
-    border-bottom: 1px solid var(--border);
-  }
-  table.data td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
-  table.data tr:last-child td { border-bottom: none; }
-  table.data tbody tr { transition: background .1s; }
-  table.data tbody tr:hover { background: rgba(27, 39, 56, .5); }
-  table.data td .bk-id { font-family: var(--mono); font-size: 12px; color: var(--text-2); word-break: break-all; }
-  .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
-  .icon-btn {
-    display: inline-flex; align-items: center; gap: 5px;
-    border: 1px solid var(--border-2); background: var(--panel-2); color: var(--text-2);
-    border-radius: 8px; padding: 5px 9px; font-size: 11.5px; font-weight: 600;
-    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
-  }
-  .icon-btn:hover { color: var(--text); background: var(--panel-3); }
-  .icon-btn.danger:hover { color: var(--red); border-color: rgba(248,113,113,.4); background: var(--red-dim); }
-  .icon-btn .icon { width: 13px; height: 13px; }
-
-  /* ============ Empty / Loading ============ */
-  .empty-state {
-    display: flex; flex-direction: column; align-items: center; gap: 10px;
-    padding: 44px 20px; color: var(--muted); text-align: center;
-    border: 1.5px dashed var(--border-2); border-radius: var(--radius); background: var(--panel);
-  }
-  .empty-state .icon { width: 34px; height: 34px; opacity: .4; }
-  .empty-state b { color: var(--text-2); font-size: 14px; }
-  .empty-state p { font-size: 12.5px; max-width: 380px; line-height: 1.5; }
-  .skeleton { position: relative; overflow: hidden; background: var(--panel-2); border-radius: 8px; color: transparent !important; }
-  .skeleton::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent);
-    animation: shimmer 1.4s infinite;
-  }
-  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-
-  /* ============ Aufgaben / Jobs ============ */
-  .jobs-list { display: flex; flex-direction: column; gap: 10px; max-height: 640px; overflow-y: auto; padding-right: 4px; }
-  .job-card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
-    overflow: hidden; transition: border-color .15s;
-  }
-  .job-card.running { border-color: rgba(56,189,248,.35); }
-  .job-card.error { border-color: rgba(248,113,113,.3); }
-  .job-head { display: flex; align-items: center; gap: 12px; padding: 12px 15px; cursor: pointer; }
-  .job-icon {
-    width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none;
-    background: var(--panel-3); color: var(--text-2);
-  }
-  .job-icon .icon { width: 15px; height: 15px; }
-  .job-icon.backup { color: var(--accent); background: var(--accent-dim); }
-  .job-icon.restore { color: var(--yellow); background: var(--yellow-dim); }
-  .job-icon.scheduled { color: var(--purple); background: rgba(167,139,250,.13); }
-  .job-main { flex: 1; min-width: 0; }
-  .job-main b { font-size: 13px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .job-main .job-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-  .job-badge { flex: none; }
-  .job-chev { color: var(--muted); transition: transform .18s; }
-  .job-card.open .job-chev { transform: rotate(180deg); }
-  .job-body { display: none; }
-  .job-card.open .job-body { display: block; animation: pageIn .15s ease; }
-  .job-log {
-    background: #0a0f16; border-top: 1px solid var(--border); margin: 0;
-    padding: 13px 15px; font-family: var(--mono); font-size: 11.5px; line-height: 1.65;
-    color: #9ab3c9; max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
-  }
-  .job-error {
-    background: var(--red-dim); border-top: 1px solid rgba(248,113,113,.25);
-    padding: 10px 15px; font-size: 12.5px; color: var(--red); font-family: var(--mono);
-  }
-  .jobs-foot { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
-
-  /* ============ Einstellungen ============ */
-  .settings-nav { display: flex; gap: 6px; border-bottom: 1px solid var(--border); padding: 0 18px; overflow-x: auto; }
-  .settings-nav button {
-    background: none; border: none; cursor: pointer; font-family: inherit;
-    padding: 13px 14px; font-size: 13px; font-weight: 600; color: var(--muted);
-    border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
-  }
-  .settings-nav button:hover { color: var(--text); }
-  .settings-nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .settings-page { padding: 22px 18px 8px; }
-  .settings-page.hidden { display: none; }
-  .section-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 700; margin: 4px 0 14px; display: flex; align-items: center; gap: 8px; }
-  .section-title .icon { width: 14px; height: 14px; }
-  .form-row { display: flex; gap: 16px; margin-bottom: 16px; }
-  .form-row > label { width: 230px; flex: none; padding-top: 9px; }
-  .form-row > label b { font-size: 13px; font-weight: 600; display: block; }
-  .form-row > label .req { color: var(--red); }
-  .form-row > label small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; font-weight: 400; }
-  .form-row .ctrl { flex: 1; min-width: 0; }
-  .form-row .ctrl input[type=text], .form-row .ctrl input[type=number], .form-row .ctrl input[type=password], .form-row .ctrl select {
-    width: 100%; max-width: 520px;
-  }
-  .form-row .ctrl .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
-  input[type=text], input[type=number], input[type=password], select {
-    background: #0b1118; border: 1px solid var(--border-2); border-radius: 9px;
-    color: var(--text); padding: 9px 12px; font-size: 13px; font-family: inherit;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  input::placeholder { color: #42536a; }
-  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56,189,248,.15); }
-  .pw-wrap { position: relative; max-width: 520px; }
-  .pw-wrap input { padding-right: 38px; width: 100%; }
-  .pw-toggle {
-    position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; color: var(--muted); cursor: pointer;
-    padding: 6px; display: grid; place-items: center; border-radius: 6px;
-  }
-  .pw-toggle:hover { color: var(--text); }
-  .pw-toggle .icon { width: 15px; height: 15px; }
-  .pw-toggle.off .icon-eye { display: none; }
-  .pw-toggle:not(.off) .icon-eye-off { display: none; }
-
-  .type-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; max-width: 560px; }
-  .tile {
-    display: flex; flex-direction: column; gap: 6px; padding: 16px;
-    border: 1px solid var(--border-2); border-radius: var(--radius-sm);
-    background: var(--panel-2); cursor: pointer; transition: border-color .15s, background .15s;
-    font-family: inherit;
-  }
-  .tile .icon { width: 20px; height: 20px; color: var(--muted); }
-  .tile b { font-size: 13.5px; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
-  .tile span { font-size: 11.5px; color: var(--muted); }
-  .tile .check { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-2); display: grid; place-items: center; color: #fff; }
-  .tile .check .icon { width: 10px; height: 10px; color: #fff; display: none; }
-  .tile:hover { border-color: var(--accent); }
-  .tile.sel { border-color: var(--accent); background: var(--accent-dim); }
-  .tile.sel .icon { color: var(--accent); }
-  .tile.sel .check { border-color: var(--accent); background: var(--accent); }
-  .tile.sel .check .icon { display: block; }
-
-  .range-row { display: flex; align-items: center; gap: 14px; max-width: 520px; }
-  .range-row input[type=range] { flex: 1; accent-color: var(--accent); }
-  .range-row output { font-weight: 700; color: var(--accent); min-width: 24px; text-align: right; font-size: 14px; }
-  .switch { position: relative; display: inline-flex; width: 42px; height: 24px; flex: none; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .switch .slider {
-    position: absolute; inset: 0; border-radius: 999px; cursor: pointer;
-    background: var(--panel-3); border: 1px solid var(--border-2); transition: background .2s;
-  }
-  .switch .slider::before {
-    content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%;
-    left: 3px; top: 3px; background: var(--muted); transition: transform .2s, background .2s;
-  }
-  .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
-  .switch input:checked + .slider::before { transform: translateX(18px); background: #fff; }
-  .toggle-row { display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 4px 0; }
-  .toggle-row b { font-size: 13px; font-weight: 600; display: block; }
-  .toggle-row small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-  .preset-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-  .cron-preset {
-    font-size: 11px; padding: 4px 10px; border-radius: 999px; font-family: var(--mono);
-    border: 1px solid var(--border-2); background: var(--panel-2); color: var(--text-2); cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s;
-  }
-  .cron-preset:hover, .cron-preset.active { background: var(--accent-dim); border-color: rgba(56,189,248,.4); color: var(--accent); }
-
-  .settings-actions {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px;
-    padding: 18px 0 0; border-top: 1px solid var(--border);
-  }
-  .settings-msg { font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
-  .settings-msg .icon { width: 14px; height: 14px; }
-  .settings-msg.ok { color: var(--green); }
-  .settings-msg.err { color: var(--red); }
-  .remote-preview {
-    background: #0b1118; border: 1px dashed var(--border-2); border-radius: 9px;
-    padding: 10px 13px; font-family: var(--mono); font-size: 12px; color: var(--text-2);
-    max-width: 560px; overflow-x: auto; word-break: break-all;
-  }
-
-  /* ============ Modal & Toast ============ */
-  .modal-bg {
-    position: fixed; inset: 0; z-index: 50;
-    background: rgba(4, 8, 14, .72); backdrop-filter: blur(5px);
-    display: flex; align-items: center; justify-content: center; padding: 20px;
-    opacity: 0; pointer-events: none; transition: opacity .18s;
-  }
-  .modal-bg.open { opacity: 1; pointer-events: auto; }
-  .modal {
-    background: var(--panel); border: 1px solid var(--border-2); border-radius: 16px;
-    width: 480px; max-width: 100%; max-height: 88vh; overflow-y: auto;
-    box-shadow: var(--shadow); transform: translateY(10px) scale(.98);
-    transition: transform .18s;
-  }
-  .modal-bg.open .modal { transform: none; }
-  .modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 0; }
-  .modal-head .modal-icon {
-    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none;
-  }
-  .modal-head .modal-icon .icon { width: 18px; height: 18px; }
-  .modal-head .modal-icon.warn { background: var(--yellow-dim); color: var(--yellow); }
-  .modal-head .modal-icon.info { background: var(--accent-dim); color: var(--accent); }
-  .modal-head .modal-icon.danger { background: var(--red-dim); color: var(--red); }
-  .modal-head h3 { font-size: 15.5px; flex: 1; }
-  .modal-close {
-    background: none; border: none; color: var(--muted); cursor: pointer; padding: 6px;
-    border-radius: 8px; display: grid; place-items: center;
-  }
-  .modal-close:hover { background: var(--panel-3); color: var(--text); }
-  .modal-close .icon { width: 16px; height: 16px; }
-  .modal-body { padding: 16px 20px 6px; font-size: 13px; line-height: 1.55; color: var(--text-2); }
-  .modal-body .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12.5px; margin-bottom: 10px; }
-  .modal-body .kv dt { color: var(--muted); font-weight: 600; }
-  .modal-body .kv dd { color: var(--text-2); font-family: var(--mono); word-break: break-all; }
-  .modal-body .warn-box {
-    border: 1px solid rgba(251,191,36,.35); background: var(--yellow-dim); color: var(--yellow);
-    border-radius: 9px; padding: 10px 13px; font-size: 12px; line-height: 1.5; margin: 12px 0;
-    display: flex; gap: 9px; align-items: flex-start;
-  }
-  .modal-body .warn-box .icon { width: 15px; height: 15px; flex: none; margin-top: 1px; }
-  .modal-body label.checkbox {
-    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
-    font-size: 12.5px; color: var(--text-2); padding: 10px 12px;
-    background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; margin: 12px 0;
-  }
-  .modal-body label.checkbox input { margin-top: 2px; accent-color: var(--accent); width: 15px; height: 15px; }
-  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px 18px; }
-
-  .toasts { position: fixed; bottom: 22px; right: 22px; z-index: 90; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
-  .toast {
-    background: var(--panel-2); border: 1px solid var(--border-2); border-left: 3px solid var(--green);
-    border-radius: 11px; box-shadow: var(--shadow); padding: 12px 14px;
-    display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text);
-    animation: toastIn .22s ease; overflow: hidden; position: relative;
-  }
-  .toast.err { border-left-color: var(--red); }
-  .toast.warn { border-left-color: var(--yellow); }
-  .toast .icon { width: 16px; height: 16px; flex: none; margin-top: 1px; }
-  .toast .icon.check { color: var(--green); }
-  .toast.err .icon { color: var(--red); }
-  .toast.warn .icon { color: var(--yellow); }
-  .toast .toast-msg { flex: 1; line-height: 1.45; word-break: break-word; }
-  .toast .toast-close { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px; display: grid; place-items: center; flex: none; }
-  .toast .toast-close .icon { width: 13px; height: 13px; margin: 0; color: var(--muted); }
-  .toast .toast-bar { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--green); animation: toastbar 5s linear forwards; }
-  .toast.err .toast-bar { background: var(--red); }
-  @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
-  @keyframes toastbar { from { width: 100%; } to { width: 0; } }
-
-  .hidden { display: none !important; }
-
-  /* ============ Responsive ============ */
-  @media (max-width: 900px) {
-    .app { grid-template-columns: 1fr; }
-    .sidebar {
-      position: sticky; top: 0; height: auto; z-index: 40;
-      flex-direction: row; align-items: center; padding: 10px 12px;
-      border-right: none; border-bottom: 1px solid var(--border);
-    }
-    .brand { padding: 0 8px 0 2px; }
-    .brand b { font-size: 13px; }
-    .brand span, .sidebar-foot { display: none; }
-    nav { flex-direction: row; gap: 2px; overflow-x: auto; }
-    .nav-item { padding: 8px 10px; font-size: 12px; }
-    .nav-item .nav-label { display: none; }
-    .main { padding: 18px 14px 50px; }
-    .form-row { flex-direction: column; gap: 6px; }
-    .form-row > label { width: auto; padding-top: 0; }
-    .form-row .ctrl { width: 100%; }
-    .c-grid { grid-template-columns: 1fr; }
-    .search-wrap { max-width: none; }
-    table.data th:nth-child(3), table.data td:nth-child(3) { display: none; }
-    .modal { width: 100%; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  }
+:root{--bg:#080c12;--bg-grad-1:rgba(56,189,248,.07);--bg-grad-2:rgba(168,85,247,.05);--panel:#101722;--panel-2:#151f2d;--panel-3:#1b2738;--border:#1d2939;--border-2:#2b3b52;--text:#e6eef7;--text-2:#a9bccd;--muted:#6d8299;--accent:#38bdf8;--accent-2:#818cf8;--accent-grad:linear-gradient(135deg,#38bdf8,#6366f1);--accent-dim:rgba(56,189,248,.12);--green:#34d399;--green-dim:rgba(52,211,153,.12);--yellow:#fbbf24;--yellow-dim:rgba(251,191,36,.12);--red:#f87171;--red-dim:rgba(248,113,113,.12);--purple:#a78bfa;--radius:14px;--radius-sm:9px;--shadow:0 12px 34px rgba(0,0,0,.4);--mono:ui-monospace,SFMono-Regular,"Cascadia Code",Consolas,monospace;--font:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);background-image:radial-gradient(900px 500px at 85% -10%,var(--bg-grad-1),transparent 60%),radial-gradient(800px 500px at -10% 110%,var(--bg-grad-2),transparent 60%);background-attachment:fixed;color:var(--text);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#243244;border-radius:8px;border:2px solid var(--bg)}::-webkit-scrollbar-thumb:hover{background:#2f4257}::-webkit-scrollbar-track{background:transparent}
+a{color:var(--accent);text-decoration:none}code,.mono{font-family:var(--mono);font-size:.92em}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:rgba(12,18,28,.82);backdrop-filter:blur(14px);border-right:1px solid var(--border);padding:20px 14px}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 20px}
+.brand-logo{width:38px;height:38px;border-radius:11px;flex:none;background:var(--accent-grad);display:grid;place-items:center;color:#fff;box-shadow:0 6px 18px rgba(56,189,248,.35)}
+.brand b{font-size:14.5px;line-height:1.2;display:block}.brand span{font-size:11px;color:var(--muted)}
+nav{display:flex;flex-direction:column;gap:4px;flex:1}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;border:1px solid transparent;color:var(--text-2);font-size:13.5px;font-weight:600;background:none;cursor:pointer;font-family:inherit;width:100%;text-align:left}
+.nav-item:hover{background:var(--panel-2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);border-color:rgba(56,189,248,.25)}
+.nav-item .icon{width:17px;height:17px;flex:none}.nav-item .badge{margin-left:auto}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+.badge.gray{background:var(--panel-3);color:var(--text-2);border-color:var(--border-2)}
+.badge.green{background:var(--green-dim);color:var(--green);border-color:rgba(52,211,153,.3)}
+.badge.yellow{background:var(--yellow-dim);color:var(--yellow);border-color:rgba(251,191,36,.3)}
+.badge.red{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,.3)}
+.badge.blue{background:var(--accent-dim);color:var(--accent);border-color:rgba(56,189,248,.3)}
+.sidebar-foot{display:flex;flex-direction:column;gap:8px}
+.foot-pill{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:11.5px;color:var(--text-2)}
+.foot-version{font-size:11px;color:var(--muted);text-align:center;font-family:var(--mono)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}.dot.run{background:var(--green);box-shadow:0 0 8px rgba(52,211,153,.7)}.dot.warn{background:var(--yellow)}.dot.err{background:var(--red)}.dot.stop{background:#42536a}
+.main{padding:26px 30px 60px;max-width:1180px;width:100%}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}
+.topbar h1{font-size:22px;letter-spacing:-.02em}.topbar .sub{color:var(--muted);font-size:13px;margin-top:4px}
+.top-actions{display:flex;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:7px;border-radius:9px;border:1px solid var(--border-2);padding:9px 15px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:background .15s,color .15s,border-color .15s,transform .1s}
+.btn .icon{width:15px;height:15px}
+.btn.primary{background:var(--accent-grad);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(56,189,248,.3)}
+.btn.primary:hover:not(:disabled){filter:brightness(1.08)}
+.btn.secondary{background:var(--panel-2);color:var(--text-2)}
+.btn.secondary:hover:not(:disabled){color:var(--text);background:var(--panel-3)}
+.btn.danger{background:var(--red-dim);border-color:rgba(248,113,113,.4);color:var(--red)}
+.btn.danger:hover:not(:disabled){background:rgba(248,113,113,.2)}
+.btn.sm{padding:7px 12px;font-size:12.5px}.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.loading{position:relative;pointer-events:none;opacity:.7}
+.btn.loading::after{content:"";width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.page{animation:pageIn .2s ease}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 18px;border-bottom:1px solid var(--border)}
+.card-head h2{font-size:14px;display:flex;align-items:center;gap:8px}.card-head h2 .icon{width:16px;height:16px;color:var(--accent)}
+.card-body{padding:16px 18px}
+.setup-banner{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,rgba(56,189,248,.12),rgba(99,102,241,.1));border:1px solid rgba(56,189,248,.3);border-radius:var(--radius);padding:16px 18px;margin-bottom:18px}
+.setup-banner .icon{width:26px;height:26px;color:var(--accent);flex:none}
+.setup-banner div{flex:1}.setup-banner b{font-size:14px}.setup-banner p{font-size:12.5px;color:var(--text-2);margin-top:3px;line-height:1.5}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;transition:border-color .15s,transform .15s}
+.stat-card:hover{border-color:var(--border-2);transform:translateY(-2px)}
+.stat-card .stat-icon{position:absolute;right:-8px;top:-8px;width:64px;height:64px;opacity:.07}
+.stat-card .stat-icon .icon{width:64px;height:64px}
+.stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.stat-val{font-size:27px;font-weight:750;letter-spacing:-.02em;margin:7px 0 2px}
+.stat-sub{font-size:12px;color:var(--muted)}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:360px}
+.search-wrap .icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);width:15px;height:15px;pointer-events:none}
+.search-wrap input{width:100%;padding-left:34px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:6px 13px;border-radius:999px;font-size:12.5px;font-weight:600;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text-2);cursor:pointer;transition:background .15s,color .15s,border-color .15s;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.chip:hover{color:var(--text)}
+.chip.active{background:var(--accent-dim);color:var(--accent);border-color:rgba(56,189,248,.35)}
+.chip .count{font-size:11px;opacity:.75}
+.c-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.c-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px;display:flex;flex-direction:column;gap:12px;transition:border-color .15s,transform .15s,box-shadow .15s}
+.c-card:hover{border-color:var(--border-2);transform:translateY(-2px);box-shadow:var(--shadow)}
+.c-head{display:flex;align-items:flex-start;gap:10px}
+.c-head .dot{margin-top:5px}.c-title{flex:1;min-width:0}
+.c-title b{font-size:14.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-image{font-size:11.5px;color:var(--muted);font-family:var(--mono);display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-meta{display:flex;gap:14px;flex-wrap:wrap;border-top:1px dashed var(--border);padding-top:10px}
+.c-meta-item{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
+.c-meta-item .icon{width:13px;height:13px}.c-meta-item b{color:var(--text-2);font-weight:600}
+.c-actions{display:flex;gap:8px}.c-actions .btn{flex:1;justify-content:center}
+.b-group{margin-bottom:12px}
+.b-group-head{width:100%;display:flex;align-items:center;gap:11px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 15px;cursor:pointer;font-family:inherit;font-size:13.5px;color:var(--text);transition:border-color .15s,background .15s}
+.b-group-head:hover{border-color:var(--border-2);background:var(--panel-3)}
+.b-group-head .g-count{margin-left:auto;font-size:11.5px;color:var(--muted);font-weight:600;margin-right:6px}
+.b-group-head .chev{transition:transform .18s;color:var(--muted)}
+.b-group.open .b-group-head .chev{transform:rotate(180deg)}
+.b-group-body{display:none}
+.b-group.open .b-group-body{display:block;margin-top:8px;animation:pageIn .18s ease}
+table.data{width:100%;border-collapse:collapse}
+table.data th{text-align:left;padding:9px 14px;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)}
+table.data td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px}
+table.data tr:last-child td{border-bottom:none}
+table.data tbody tr{transition:background .1s}
+table.data tbody tr:hover{background:rgba(27,39,56,.5)}
+table.data td .bk-id{font-family:var(--mono);font-size:12px;color:var(--text-2);word-break:break-all}
+.row-actions{display:flex;gap:6px;justify-content:flex-end}
+.icon-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--text-2);border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s,color .15s,border-color .15s;font-family:inherit}
+.icon-btn:hover{color:var(--text);background:var(--panel-3)}
+.icon-btn.danger:hover{color:var(--red);border-color:rgba(248,113,113,.4);background:var(--red-dim)}
+.icon-btn .icon{width:13px;height:13px}
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:10px;padding:44px 20px;color:var(--muted);text-align:center;border:1.5px dashed var(--border-2);border-radius:var(--radius);background:var(--panel)}
+.empty-state .icon{width:34px;height:34px;opacity:.4}
+.empty-state b{color:var(--text-2);font-size:14px}
+.empty-state p{font-size:12.5px;max-width:380px;line-height:1.5}
+.skeleton{position:relative;overflow:hidden;background:var(--panel-2);border-radius:8px;color:transparent !important}
+.skeleton::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);animation:shimmer 1.4s infinite}
+@keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.jobs-list{display:flex;flex-direction:column;gap:10px;max-height:640px;overflow-y:auto;padding-right:4px}
+.job-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;transition:border-color .15s}
+.job-card.running{border-color:rgba(56,189,248,.35)}
+.job-card.error{border-color:rgba(248,113,113,.3)}
+.job-head{display:flex;align-items:center;gap:12px;padding:12px 15px;cursor:pointer;background:none;border:none;width:100%;text-align:left;color:inherit;font-family:inherit;font-size:inherit}
+.job-icon{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;background:var(--panel-3);color:var(--text-2)}
+.job-icon .icon{width:15px;height:15px}
+.job-icon.backup{color:var(--accent);background:var(--accent-dim)}
+.job-icon.restore{color:var(--yellow);background:var(--yellow-dim)}
+.job-icon.scheduled{color:var(--purple);background:rgba(167,139,250,.13)}
+.job-main{flex:1;min-width:0}
+.job-main b{font-size:13px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.job-main .job-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.job-badge{flex:none}.job-chev{color:var(--muted);transition:transform .18s;flex:none}
+.job-card.open .job-chev{transform:rotate(180deg)}
+.job-log{background:#0a0f16;border-top:1px solid var(--border);margin:0;padding:13px 15px;font-family:var(--mono);font-size:11.5px;line-height:1.65;color:#9ab3c9;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+.job-error{background:var(--red-dim);border-top:1px solid rgba(248,113,113,.25);padding:10px 15px;font-size:12.5px;color:var(--red);font-family:var(--mono);word-break:break-word}
+.job-result{background:rgba(52,211,153,.07);border-top:1px solid rgba(52,211,153,.2);padding:10px 15px;font-size:12px;color:var(--text-2);line-height:1.55}
+.job-result b{color:var(--green)}
+.job-progress{height:6px;background:var(--panel-3);border-radius:999px;overflow:hidden;margin:0 15px 4px}
+.job-progress>i{display:block;height:100%;background:var(--accent-grad);border-radius:999px;transition:width .4s ease}
+.job-progress.done>i{background:var(--green)}
+.job-progress.failed>i{background:var(--red)}
+.jobs-foot{display:flex;align-items:center;gap:12px;padding:12px 15px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.jobs-foot .spacer{flex:1}
+.settings-nav{display:flex;gap:6px;border-bottom:1px solid var(--border);padding:0 18px;overflow-x:auto}
+.settings-nav button{background:none;border:none;cursor:pointer;font-family:inherit;padding:13px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.settings-nav button:hover{color:var(--text)}
+.settings-nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.settings-page{padding:22px 18px 8px}
+.settings-page.hidden{display:none}
+.section-title{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin:4px 0 14px;display:flex;align-items:center;gap:8px}
+.section-title .icon{width:14px;height:14px}
+.form-row{display:flex;gap:16px;margin-bottom:16px}
+.form-row>label{width:230px;flex:none;padding-top:9px}
+.form-row>label b{font-size:13px;font-weight:600;display:block}
+.form-row>label .req{color:var(--red)}
+.form-row>label small{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;font-weight:400}
+.form-row .ctrl{flex:1;min-width:0}
+.form-row .ctrl input[type=text],.form-row .ctrl input[type=number],.form-row .ctrl input[type=password],.form-row .ctrl select{width:100%;max-width:520px}
+.form-row .ctrl .hint{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+input[type=text],input[type=number],input[type=password],select{background:#0b1118;border:1px solid var(--border-2);border-radius:9px;color:var(--text);padding:9px 12px;font-size:13px;font-family:inherit;transition:border-color .15s,box-shadow .15s}
+input::placeholder{color:#42536a}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.15)}
+input.invalid,select.invalid{border-color:var(--red);box-shadow:0 0 0 3px rgba(248,113,113,.15)}
+.field-err{font-size:11.5px;color:var(--red);margin-top:5px;display:flex;align-items:center;gap:5px}
+.pw-wrap{position:relative;max-width:520px}
+.pw-wrap input{padding-right:38px;width:100%}
+.pw-toggle{position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;display:grid;place-items:center;border-radius:6px}
+.pw-toggle:hover{color:var(--text)}
+.pw-toggle .icon{width:15px;height:15px}
+.pw-toggle[aria-pressed="true"] .icon-eye{display:none}
+.pw-toggle[aria-pressed="false"] .icon-eye-off{display:none}
+.type-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;max-width:560px}
+.tile{display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid var(--border-2);border-radius:var(--radius-sm);background:var(--panel-2);cursor:pointer;transition:border-color .15s,background .15s;font-family:inherit;text-align:left;color:inherit}
+.tile .icon{width:20px;height:20px;color:var(--muted)}
+.tile b{font-size:13.5px;color:var(--text);display:flex;align-items:center;justify-content:space-between}
+.tile span{font-size:11.5px;color:var(--muted)}
+.tile .check{width:16px;height:16px;border-radius:50%;border:2px solid var(--border-2);display:grid;place-items:center;color:#fff}
+.tile .check .icon{width:10px;height:10px;color:#fff;display:none}
+.tile:hover{border-color:var(--accent)}
+.tile.sel{border-color:var(--accent);background:var(--accent-dim)}
+.tile.sel .icon{color:var(--accent)}
+.tile.sel .check{border-color:var(--accent);background:var(--accent)}
+.tile.sel .check .icon{display:block}
+.range-row{display:flex;align-items:center;gap:14px;max-width:520px}
+.range-row input[type=range]{flex:1;accent-color:var(--accent)}
+.range-row output{font-weight:700;color:var(--accent);min-width:24px;text-align:right;font-size:14px}
+.switch{position:relative;display:inline-flex;width:42px;height:24px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;inset:0;border-radius:999px;cursor:pointer;background:var(--panel-3);border:1px solid var(--border-2);transition:background .2s}
+.switch .slider::before{content:"";position:absolute;width:16px;height:16px;border-radius:50%;left:3px;top:3px;background:var(--muted);transition:transform .2s,background .2s}
+.switch input:checked+.slider{background:var(--accent);border-color:var(--accent)}
+.switch input:checked+.slider::before{transform:translateX(18px);background:#fff}
+.switch input:focus-visible+.slider{outline:2px solid var(--accent);outline-offset:2px}
+.toggle-row{display:flex;align-items:center;gap:12px;max-width:560px;padding:4px 0}
+.toggle-row b{font-size:13px;font-weight:600;display:block}
+.toggle-row small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.preset-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.cron-preset{font-size:11px;padding:4px 10px;border-radius:999px;font-family:var(--mono);border:1px solid var(--border-2);background:var(--panel-2);color:var(--text-2);cursor:pointer;transition:background .15s,color .15s,border-color .15s;font-family:var(--mono)}
+.cron-preset:hover,.cron-preset.active{background:var(--accent-dim);border-color:rgba(56,189,248,.4);color:var(--accent)}
+.cron-hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+.cron-hint.err{color:var(--red)}
+.cron-hint.ok{color:var(--green)}
+.settings-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;padding:18px 0 0;border-top:1px solid var(--border)}
+.settings-msg{font-size:12.5px;display:flex;align-items:center;gap:6px}
+.settings-msg .icon{width:14px;height:14px}
+.settings-msg.ok{color:var(--green)}
+.settings-msg.err{color:var(--red)}
+.remote-preview{background:#0b1118;border:1px dashed var(--border-2);border-radius:9px;padding:10px 13px;font-family:var(--mono);font-size:12px;color:var(--text-2);max-width:560px;overflow-x:auto;word-break:break-all}
+.modal-bg{position:fixed;inset:0;z-index:50;background:rgba(4,8,14,.72);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .18s}
+.modal-bg.open{opacity:1;pointer-events:auto}
+.modal{background:var(--panel);border:1px solid var(--border-2);border-radius:16px;width:480px;max-width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);transform:translateY(10px) scale(.98);transition:transform .18s}
+.modal-bg.open .modal{transform:none}
+.modal-head{display:flex;align-items:center;gap:12px;padding:18px 20px 0}
+.modal-head .modal-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none}
+.modal-head .modal-icon .icon{width:18px;height:18px}
+.modal-head .modal-icon.warn{background:var(--yellow-dim);color:var(--yellow)}
+.modal-head .modal-icon.info{background:var(--accent-dim);color:var(--accent)}
+.modal-head .modal-icon.danger{background:var(--red-dim);color:var(--red)}
+.modal-head h3{font-size:15.5px;flex:1}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;border-radius:8px;display:grid;place-items:center}
+.modal-close:hover{background:var(--panel-3);color:var(--text)}
+.modal-close .icon{width:16px;height:16px}
+.modal-body{padding:16px 20px 6px;font-size:13px;line-height:1.55;color:var(--text-2)}
+.modal-body .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px;margin-bottom:10px}
+.modal-body .kv dt{color:var(--muted);font-weight:600}
+.modal-body .kv dd{color:var(--text-2);font-family:var(--mono);word-break:break-all}
+.modal-body .warn-box{border:1px solid rgba(251,191,36,.35);background:var(--yellow-dim);color:var(--yellow);border-radius:9px;padding:10px 13px;font-size:12px;line-height:1.5;margin:12px 0;display:flex;gap:9px;align-items:flex-start}
+.modal-body .warn-box .icon{width:15px;height:15px;flex:none;margin-top:1px}
+.modal-body .danger-box{border:1px solid rgba(248,113,113,.35);background:var(--red-dim);color:var(--red);border-radius:9px;padding:10px 13px;font-size:12px;line-height:1.5;margin:12px 0;display:flex;gap:9px;align-items:flex-start}
+.modal-body .danger-box .icon{width:15px;height:15px;flex:none;margin-top:1px}
+.modal-body label.checkbox{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12.5px;color:var(--text-2);padding:10px 12px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;margin:12px 0}
+.modal-body label.checkbox input{margin-top:2px;accent-color:var(--accent);width:15px;height:15px}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px 18px;flex-wrap:wrap}
+.wizard-steps{display:flex;gap:6px;margin-bottom:14px}
+.wizard-steps .step{flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:6px 4px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border)}
+.wizard-steps .step.active{color:var(--accent);border-color:rgba(56,189,248,.4);background:var(--accent-dim)}
+.wizard-steps .step.done{color:var(--green);border-color:rgba(52,211,153,.35)}
+.toasts{position:fixed;bottom:22px;right:22px;z-index:90;display:flex;flex-direction:column;gap:10px;max-width:380px}
+.toast{background:var(--panel-2);border:1px solid var(--border-2);border-left:3px solid var(--green);border-radius:11px;box-shadow:var(--shadow);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--text);animation:toastIn .22s ease;overflow:hidden;position:relative}
+.toast.err{border-left-color:var(--red)}
+.toast.warn{border-left-color:var(--yellow)}
+.toast .icon{width:16px;height:16px;flex:none;margin-top:1px}
+.toast .icon.check{color:var(--green)}
+.toast.err .icon{color:var(--red)}
+.toast.warn .icon{color:var(--yellow)}
+.toast .toast-msg{flex:1;line-height:1.45;word-break:break-word}
+.toast .toast-close{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px;display:grid;place-items:center;flex:none}
+.toast .toast-close .icon{width:13px;height:13px;margin:0;color:var(--muted)}
+.toast .toast-bar{position:absolute;bottom:0;left:0;height:2px;background:var(--green);animation:toastbar 5s linear forwards}
+.toast.err .toast-bar{background:var(--red)}
+@keyframes toastIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+@keyframes toastbar{from{width:100%}to{width:0}}
+.hidden{display:none !important}
+@media (max-width:900px){.app{grid-template-columns:1fr}.sidebar{position:sticky;top:0;height:auto;z-index:40;flex-direction:row;align-items:center;padding:10px 12px;border-right:none;border-bottom:1px solid var(--border)}.brand{padding:0 8px 0 2px}.brand b{font-size:13px}.brand span,.sidebar-foot{display:none}nav{flex-direction:row;gap:2px;overflow-x:auto}.nav-item{padding:8px 10px;font-size:12px}.nav-item .nav-label{display:none}.main{padding:18px 14px 50px}.form-row{flex-direction:column;gap:6px}.form-row>label{width:auto;padding-top:0}.form-row .ctrl{width:100%}.c-grid{grid-template-columns:1fr}.search-wrap{max-width:none}table.data th:nth-child(3),table.data td:nth-child(3){display:none}.modal{width:100%}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
 </style>
 </head>
 <body>
-
 <div class="app">
-  <!-- ================= Sidebar ================= -->
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-logo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div>
-      <div><b>DockGuard</b><span>Unraid Container Backup</span></div>
-    </div>
-    <nav>
-      <button class="nav-item" data-page="dashboard"><span data-ico="dashboard"></span><span class="nav-label">Übersicht</span></button>
-      <button class="nav-item" data-page="containers"><span data-ico="box"></span><span class="nav-label">Container</span><span class="badge gray" id="navContainersBadge"></span></button>
-      <button class="nav-item" data-page="backups"><span data-ico="archive"></span><span class="nav-label">Backups</span><span class="badge gray" id="navBackupsBadge"></span></button>
-      <button class="nav-item" data-page="settings"><span data-ico="settings"></span><span class="nav-label">Einstellungen</span></button>
-      <button class="nav-item" data-page="jobs"><span data-ico="terminal"></span><span class="nav-label">Aufgaben</span><span class="badge gray" id="navJobsBadge"></span></button>
-    </nav>
-    <div class="sidebar-foot">
-      <div class="foot-pill" id="footStorage" title="Speicher-Ziel"><span class="dot" id="footStorageDot"></span><span id="footStorageText">Lade …</span></div>
-      <div class="foot-version" id="footVersion"></div>
-    </div>
-  </aside>
-
-  <!-- ================= Main ================= -->
-  <main class="main">
-    <header class="topbar">
-      <div>
-        <h1 id="pageTitle">Übersicht</h1>
-        <p class="sub" id="pageSub"></p>
-      </div>
-      <div class="top-actions">
-        <button class="btn primary icon-lge" id="btnBackupAllTop" onclick="startBackupAll()">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Alle jetzt sichern
-        </button>
-        <button class="btn secondary icon" onclick="refreshAll(true)" title="Manuell aktualisieren">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <!-- ============ Seite: Übersicht ============ -->
-    <section id="page-dashboard" class="page">
-      <div id="dashSetup"></div>
-      <div class="stat-grid" id="dashStats"></div>
-      <div class="card" style="margin-top:18px;">
-        <div class="card-head">
-          <h2><span data-ico="clock"></span> Letzte Aufgaben</h2>
-          <button class="btn secondary sm" onclick="go('jobs')">Alle anzeigen</button>
-        </div>
-        <div class="card-body" id="dashJobs"></div>
-      </div>
-    </section>
-
-    <!-- ============ Seite: Container ============ -->
-    <section id="page-containers" class="page hidden">
-      <div class="toolbar">
-        <div class="search-wrap">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="containerSearch" placeholder="Container suchen …" oninput="renderContainers()">
-        </div>
-        <div class="chips" id="containerChips">
-          <button class="chip active" data-filter="all" onclick="setContainerFilter('all')">Alle <span class="count" id="chipAll"></span></button>
-          <button class="chip" data-filter="running" onclick="setContainerFilter('running')">Läuft <span class="count" id="chipRun"></span></button>
-          <button class="chip" data-filter="stopped" onclick="setContainerFilter('stopped')">Gestoppt <span class="count" id="chipStop"></span></button>
-        </div>
-      </div>
-      <div id="containerGrid"></div>
-    </section>
-
-    <!-- ============ Seite: Backups ============ -->
-    <section id="page-backups" class="page hidden">
-      <div class="toolbar">
-        <div class="search-wrap">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="backupSearch" placeholder="Backups filtern …" oninput="renderBackups()">
-        </div>
-        <button class="btn secondary sm" onclick="expandAll(true)" id="btnExpandAll">Alle aufklappen</button>
-        <button class="btn secondary sm hidden" onclick="expandAll(false)" id="btnCollapseAll">Alle zuklappen</button>
-      </div>
-      <div id="backupGroups"></div>
-    </section>
-
-    <!-- ============ Seite: Einstellungen ============ -->
-    <section id="page-settings" class="page hidden">
-      <div class="card">
-        <div class="settings-nav" id="settingsNav">
-          <button class="active" data-tab="target" onclick="setSettingsTab('target')">Speicher-Ziel</button>
-          <button data-tab="plan" onclick="setSettingsTab('plan')">Zeitplan &amp; Verhalten</button>
-          <button data-tab="filters" onclick="setSettingsTab('filters')">Ausschlüsse &amp; Pfade</button>
-          <button data-tab="advanced" onclick="setSettingsTab('advanced')">Erweitert</button>
-        </div>
-
-        <div class="settings-page" id="tab-target">
-          <div class="section-title"><span data-ico="database"></span> Backup-Typ</div>
-          <div class="type-tiles" id="typeTiles">
-            <button class="tile" data-type="smb" onclick="setBackupType('smb')">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-              <b>SMB-Share <span class="check"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></b>
-              <span>NAS / Samba-Server im Lokalnetz</span>
-            </button>
-            <button class="tile" data-type="s3" onclick="setBackupType('s3')">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
-              <b>S3-Storage <span class="check"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></b>
-              <span>AWS, Minio, Garage, Wasabi, …</span>
-            </button>
-          </div>
-
-          <div id="settings-smb">
-            <div class="section-title" style="margin-top:22px;"><span data-ico="server"></span> SMB-Verbindung</div>
-            <div class="form-row">
-              <label><b>Host / IP <span class="req">*</span></b><small>Adresse des SMB-Servers</small></label>
-              <div class="ctrl"><input type="text" id="smb_host" placeholder="192.168.1.100"></div>
-            </div>
-            <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
-              <div class="ctrl"><input type="text" id="smb_user" placeholder="Benutzername"><div class="hint">Benutzer mit Schreibrechten auf den Share</div></div>
-              <div class="ctrl"><input type="number" id="smb_port" min="1" max="65535" value="445"></div>
-              <div class="ctrl">
-                <div class="pw-wrap"><input type="password" id="smb_pass" placeholder="Passwort"><button class="pw-toggle" onclick="togglePw('smb_pass', this)" type="button"><svg class="icon icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></button></div>
-                <div class="hint">Wird nicht im Klartext angezeigt</div>
-              </div>
-            </div>
-            <div class="form-row">
-              <label><b>Share <span class="req">*</span></b><small>Name des SMB-Shares</small></label>
-              <div class="ctrl"><input type="text" id="smb_share" placeholder="backup"></div>
-            </div>
-            <div class="form-row">
-              <label><b>Unterverzeichnis</b><small>Optionaler Teilpfad im Share, z. B. <code>unraid/backups</code></small></label>
-              <div class="ctrl"><input type="text" id="smb_path" placeholder="unraid-containers"></div>
-            </div>
-          </div>
-
-          <div id="settings-s3" class="hidden">
-            <div class="section-title" style="margin-top:22px;"><span data-ico="database"></span> S3-Verbindung</div>
-            <div class="form-row">
-              <label><b>Provider</b></label>
-              <div class="ctrl"><select id="s3_provider">
-                <option value="AWS">AWS</option>
-                <option value="Minio">Minio</option>
-                <option value="Garage">Garage</option>
-                <option value="Ceph">Ceph</option>
-                <option value="DigitalOcean">DigitalOcean</option>
-                <option value="Wasabi">Wasabi</option>
-                <option value="Backblaze B2">Backblaze B2</option>
-                <option value="Other">Anderer (rclone-Provider)</option>
-              </select></div>
-            </div>
-            <div class="form-row">
-              <label><b>Endpoint</b><small>z. B. Minio/Garage – bei AWS leer lassen</small></label>
-              <div class="ctrl"><input type="text" id="s3_endpoint" placeholder="https://s3.meine-domain.de"></div>
-            </div>
-            <div class="form-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
-              <div class="ctrl"><input type="text" id="s3_region" value="us-east-1"></div>
-              <div class="ctrl"><input type="text" id="s3_bucket" placeholder="Bucket-Name"><div class="hint">Bucket <b style="color:var(--red)">*</b> erforderlich</div></div>
-            </div>
-            <div class="form-row">
-              <label><b>Zugangsschlüssel <span class="req">*</span></b></label>
-              <div class="ctrl"><input type="text" id="s3_access_key" placeholder="Access Key ID"></div>
-            </div>
-            <div class="form-row">
-              <label><b>Geheimer Schlüssel <span class="req">*</span></b><small>Wird nicht im Klartext angezeigt</small></label>
-              <div class="ctrl"><div class="pw-wrap"><input type="password" id="s3_secret_key" placeholder="Secret Access Key"><button class="pw-toggle" onclick="togglePw('s3_secret_key', this)" type="button"><svg class="icon icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></button></div></div>
-            </div>
-            <div class="form-row">
-              <label><b>Unterverzeichnis</b><small>Optionaler Prefix im Bucket</small></label>
-              <div class="ctrl"><input type="text" id="s3_path" placeholder="unraid-containers"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-page hidden" id="tab-plan">
-          <div class="section-title"><span data-ico="clock"></span> Zeitplan (Cron, UTC)</div>
-          <div class="form-row">
-            <label><b>Cron-Ausdruck</b><small>Wann automatisch gesichert wird</small></label>
-            <div class="ctrl">
-              <input type="text" id="schedule" placeholder="0 3 * * *" oninput="syncPreset()">
-              <div class="preset-chips" id="schedulePresets">
-                <button class="cron-preset" data-cron="0 3 * * *" onclick="setSchedule(this)">Täglich 03:00</button>
-                <button class="cron-preset" data-cron="0 */6 * * *" onclick="setSchedule(this)">Alle 6 Stunden</button>
-                <button class="cron-preset" data-cron="0 2 * * 0" onclick="setSchedule(this)">Sonntags 02:00</button>
-                <button class="cron-preset" data-cron="0 22 * * 5" onclick="setSchedule(this)">Freitags 22:00</button>
-                <button class="cron-preset" data-cron="0 1 */2 * *" onclick="setSchedule(this)">Alle 2 Tage</button>
-              </div>
-            </div>
-          </div>
-          <div class="section-title" style="margin-top:22px;"><span data-ico="layers"></span> Aufbewahrung &amp; Tempo</div>
-          <div class="form-row">
-            <label><b>Backups pro Container behalten</b><small><code>0</code> = alle behalten; danach werden die ältesten automatisch gelöscht</small></label>
-            <div class="ctrl"><input type="number" id="keep" min="0" value="0" style="max-width:120px;"></div>
-          </div>
-          <div class="form-row">
-            <label><b>Parallele Backups</b><small>Mehrere Container gleichzeitig sichern – spart Zeit, braucht aber mehr CPU/I/O</small></label>
-            <div class="ctrl">
-              <div class="range-row">
-                <input type="range" id="parallel" min="1" max="8" value="2" oninput="document.getElementById('parallelOut').value=this.value">
-                <output id="parallelOut">2</output>
-              </div>
-            </div>
-          </div>
-          <div class="form-row">
-            <label><b>Bandbreitenlimit</b><small>rclone-Limit, leer = unbegrenzt. z. B. <code>8M</code>, <code>500K</code>, <code>off</code></small></label>
-            <div class="ctrl"><input type="text" id="bwlimit" placeholder="leer = unbegrenzt" style="max-width:220px;"></div>
-          </div>
-          <div class="form-row">
-            <label><b>Upload-Verifizierung</b><small>Größencheck des Backups auf dem Ziel nach dem Upload</small></label>
-            <div class="ctrl"><div class="toggle-row"><label class="switch"><input type="checkbox" id="verify_upload"><span class="slider"></span></label><div><b>Upload prüfen</b><small>Empfohlen – erkennt abgebrochene/beschädigte Uploads</small></div></div></div>
-          </div>
-        </div>
-
-        <div class="settings-page hidden" id="tab-filters">
-          <div class="section-title"><span data-ico="filter"></span> Ausschlüsse</div>
-          <div class="form-row">
-            <label><b>Ausgeschlossene Container</b><small>Kommagetrennte Namen, die nie gesichert werden</small></label>
-            <div class="ctrl"><input type="text" id="exclude" placeholder="dockguard"><div class="hint">Standard: <code>dockguard,container-backup</code> (sich selbst nie sichern)</div></div>
-          </div>
-          <div class="form-row">
-            <label><b>Auszuschließende Mounts</b><small>Mounts, deren Quelle oder Ziel einen dieser Ausdrücke enthält (Kommagetrennt) – z. B. Caches</small></label>
-            <div class="ctrl"><input type="text" id="exclude_mounts" placeholder="z. B. /cache, plex/Library/Application Support"><div class="hint">Praxis-Tipp: große Caches wie <code>transcode</code> oder <code>cache</code> sparen Platz und Zeit</div></div>
-          </div>
-          <div class="section-title" style="margin-top:22px;"><span data-ico="box"></span> Unraid-Templates</div>
-          <div class="form-row">
-            <label><b>Template-Verzeichnis(e)</b><small>Wo die Community-Apps-Templates liegen (Kommagetrennt). Beim Restore wird ins erste geschrieben.</small></label>
-            <div class="ctrl"><input type="text" id="templates_dir" placeholder="/boot/config/plugins/dockerMan/templates-user"></div>
-          </div>
-        </div>
-
-        <div class="settings-page hidden" id="tab-advanced">
-          <div class="section-title"><span data-ico="settings"></span> Server</div>
-          <div class="form-row">
-            <label><b>Web-Port</b><small>Port der Weboberfläche – wirkt erst nach Container-Neustart</small></label>
-            <div class="ctrl"><input type="number" id="web_port" min="1" max="65535" style="max-width:140px;"></div>
-          </div>
-          <div class="form-row">
-            <label><b>rclone-Timeout (Sekunden)</b><small>Maximale Dauer eines einzelnen rclone-Befehls (Upload/Download)</small></label>
-            <div class="ctrl"><input type="number" id="rclone_timeout" min="10" style="max-width:140px;"></div>
-          </div>
-          <div class="section-title" style="margin-top:22px;"><span data-ico="hard-drive"></span> Zielpfad</div>
-          <div class="form-row">
-            <label><b>Auflösung</b><small>So wird das Ziel aufgelöst (rclone-Remote)</small></label>
-            <div class="ctrl"><div class="remote-preview" id="remotePreview">–</div></div>
-          </div>
-          <div class="section-title" style="margin-top:22px;"><span data-ico="shield-check"></span> Hinweis</div>
-          <div class="form-row">
-            <label><b>Sicherheit</b><small>Der Container hat Zugriff auf den Docker-Socket und damit volle Kontrolle über den Host</small></label>
-            <div class="ctrl"><p class="hint">Den Web-Port nicht ungeschützt ins Internet legen. Optional lässt sich über die Env-Variablen <code>WEB_USER</code> / <code>WEB_PASSWORD</code> ein Login aktivieren.</p></div>
-          </div>
-        </div>
-
-        <div class="settings-body" style="padding:18px;">
-          <div class="settings-actions">
-            <button class="btn secondary" id="testBtn" onclick="testConnection()">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-              Verbindung testen
-            </button>
-            <button class="btn primary" id="saveBtn" onclick="saveSettings()">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              Speichern
-            </button>
-            <span class="settings-msg" id="settingsMsg"></span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ Seite: Aufgaben ============ -->
-    <section id="page-jobs" class="page hidden">
-      <div class="toolbar">
-        <div class="chips">
-          <button class="chip active" data-filter="all" onclick="setJobFilter('all')">Alle</button>
-          <button class="chip" data-filter="running" onclick="setJobFilter('running')">Laufend</button>
-          <button class="chip" data-filter="done" onclick="setJobFilter('done')">Fertig</button>
-          <button class="chip" data-filter="error" onclick="setJobFilter('error')">Fehler</button>
-        </div>
-        <div style="flex:1"></div>
-        <label class="chip" style="cursor:pointer;" title="Automatisch nach unten scrollen">
-          <input type="checkbox" id="autoScrollChk" checked onchange="state.jobAutoScroll=this.checked" style="accent-color:var(--accent);width:14px;height:14px;">
-          Auto-Scroll
-        </label>
-        <button class="btn secondary sm" onclick="clearFinishedJobs()">Erledigte ausblenden</button>
-      </div>
-      <div class="jobs-list" id="jobsList"></div>
-      <div class="foot-pill" style="margin-top:12px;width:fit-content;">Logs werden auf die letzten <b>&nbsp;200 Aufgaben&nbsp;</b> begrenzt (Server-seitig)</div>
-    </section>
-  </main>
+<aside class="sidebar">
+<div class="brand"><div class="brand-logo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div><div><b>DockGuard</b><span>Unraid Container Backup</span></div></div>
+<nav aria-label="Hauptnavigation">
+<button class="nav-item" data-page="dashboard" type="button"><span data-ico="dashboard" aria-hidden="true"></span><span class="nav-label">Übersicht</span></button>
+<button class="nav-item" data-page="containers" type="button"><span data-ico="box" aria-hidden="true"></span><span class="nav-label">Container</span><span class="badge gray" id="navContainersBadge"></span></button>
+<button class="nav-item" data-page="backups" type="button"><span data-ico="archive" aria-hidden="true"></span><span class="nav-label">Backups</span><span class="badge gray" id="navBackupsBadge"></span></button>
+<button class="nav-item" data-page="settings" type="button"><span data-ico="settings" aria-hidden="true"></span><span class="nav-label">Einstellungen</span></button>
+<button class="nav-item" data-page="jobs" type="button"><span data-ico="terminal" aria-hidden="true"></span><span class="nav-label">Aufgaben</span><span class="badge gray" id="navJobsBadge"></span></button>
+</nav>
+<div class="sidebar-foot"><div class="foot-pill" id="footStorage" title="Speicher-Ziel"><span class="dot" id="footStorageDot"></span><span id="footStorageText">Lade ...</span></div><div class="foot-version" id="footVersion"></div></div>
+</aside>
+<main class="main">
+<header class="topbar"><div><h1 id="pageTitle">Übersicht</h1><p class="sub" id="pageSub"></p></div>
+<div class="top-actions">
+<button class="btn primary" id="btnBackupAllTop" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Alle jetzt sichern</button>
+<button class="btn secondary" id="btnRefreshTop" type="button" title="Manuell aktualisieren"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg><span class="sr-only">Aktualisieren</span></button>
+</div></header>
+<section id="page-dashboard" class="page" aria-label="Übersicht"><div id="dashSetup"></div><div class="stat-grid" id="dashStats" aria-live="polite"></div>
+<div class="card" style="margin-top:18px;"><div class="card-head"><h2><span data-ico="clock" aria-hidden="true"></span> Letzte Aufgaben</h2><button class="btn secondary sm" id="btnDashJobs" type="button">Alle anzeigen</button></div><div class="card-body" id="dashJobs"></div></div></section>
+<section id="page-containers" class="page hidden" aria-label="Container"><div class="toolbar"><div class="search-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><label class="sr-only" for="containerSearch">Container suchen</label><input type="text" id="containerSearch" placeholder="Container suchen ..." autocomplete="off"></div>
+<div class="chips" id="containerChips" role="group" aria-label="Container-Filter"><button class="chip active" data-filter="all" type="button">Alle <span class="count" id="chipAll"></span></button><button class="chip" data-filter="running" type="button">Läuft <span class="count" id="chipRun"></span></button><button class="chip" data-filter="stopped" type="button">Gestoppt <span class="count" id="chipStop"></span></button></div></div><div id="containerGrid"></div></section>
+<section id="page-backups" class="page hidden" aria-label="Backups"><div class="toolbar"><div class="search-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><label class="sr-only" for="backupSearch">Backups filtern</label><input type="text" id="backupSearch" placeholder="Backups filtern ..." autocomplete="off"></div>
+<button class="btn secondary sm" id="btnExpandAll" type="button">Alle aufklappen</button><button class="btn secondary sm hidden" id="btnCollapseAll" type="button">Alle zuklappen</button></div><div id="backupGroups"></div></section>
+<section id="page-settings" class="page hidden" aria-label="Einstellungen"><div class="card">
+<div class="settings-nav" id="settingsNav" role="tablist" aria-label="Einstellungsbereiche">
+<button class="active" data-tab="target" type="button" role="tab" aria-selected="true">Speicher-Ziel</button>
+<button data-tab="plan" type="button" role="tab" aria-selected="false">Zeitplan und Verhalten</button>
+<button data-tab="filters" type="button" role="tab" aria-selected="false">Ausschlüsse und Pfade</button>
+<button data-tab="advanced" type="button" role="tab" aria-selected="false">Erweitert</button>
 </div>
-
+<div class="settings-page" id="tab-target" role="tabpanel">
+<div class="section-title"><span data-ico="database" aria-hidden="true"></span> Backup-Typ</div>
+<div class="type-tiles" id="typeTiles" role="radiogroup" aria-label="Backup-Typ wählen">
+<button class="tile" data-type="smb" type="button" role="radio" aria-checked="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg><b>SMB-Share <span class="check"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></span></b><span>NAS / Samba-Server im Lokalnetz</span></button>
+<button class="tile" data-type="s3" type="button" role="radio" aria-checked="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg><b>S3-Storage <span class="check"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></span></b><span>AWS, Minio, Garage, Wasabi, ...</span></button>
+</div>
+<div id="settings-smb">
+<div class="section-title" style="margin-top:22px;"><span data-ico="server" aria-hidden="true"></span> SMB-Verbindung</div>
+<div class="form-row"><label for="smb_host"><b>Host / IP <span class="req" aria-hidden="true">*</span></b><small>Adresse des SMB-Servers</small></label><div class="ctrl"><input type="text" id="smb_host" placeholder="192.168.1.100" autocomplete="off"></div></div>
+<div class="form-row"><label for="smb_user"><b>Benutzername</b><small>Benutzer mit Schreibrechten auf den Share</small></label><div class="ctrl"><input type="text" id="smb_user" placeholder="Benutzername" autocomplete="username"></div></div>
+<div class="form-row"><label for="smb_port"><b>Port</b><small>Standard: 445</small></label><div class="ctrl"><input type="number" id="smb_port" min="1" max="65535" value="445"></div></div>
+<div class="form-row"><label for="smb_pass"><b>Passwort</b><small>Wird nicht im Klartext angezeigt; führende/trailing Leerzeichen bleiben erhalten</small></label><div class="ctrl"><div class="pw-wrap"><input type="password" id="smb_pass" placeholder="Passwort" autocomplete="current-password"><button class="pw-toggle" data-pw="smb_pass" type="button" aria-pressed="false" aria-label="Passwort anzeigen"><svg class="icon icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></button></div></div></div>
+<div class="form-row"><label for="smb_share"><b>Share <span class="req" aria-hidden="true">*</span></b><small>Name des SMB-Shares</small></label><div class="ctrl"><input type="text" id="smb_share" placeholder="backup" autocomplete="off"></div></div>
+<div class="form-row"><label for="smb_path"><b>Unterverzeichnis</b><small>Optionaler Teilpfad im Share, z. B. <code>unraid/backups</code></small></label><div class="ctrl"><input type="text" id="smb_path" placeholder="unraid-containers" autocomplete="off"></div></div>
+</div>
+<div id="settings-s3" class="hidden">
+<div class="section-title" style="margin-top:22px;"><span data-ico="database" aria-hidden="true"></span> S3-Verbindung</div>
+<div class="form-row"><label for="s3_provider"><b>Provider</b></label><div class="ctrl"><select id="s3_provider"><option value="AWS">AWS</option><option value="Minio">Minio</option><option value="Garage">Garage</option><option value="Ceph">Ceph</option><option value="DigitalOcean">DigitalOcean</option><option value="Wasabi">Wasabi</option><option value="Backblaze B2">Backblaze B2</option><option value="Other">Anderer (rclone-Provider)</option></select></div></div>
+<div class="form-row"><label for="s3_endpoint"><b>Endpoint</b><small>z. B. Minio/Garage - bei AWS leer lassen</small></label><div class="ctrl"><input type="text" id="s3_endpoint" placeholder="https://s3.meine-domain.de" autocomplete="off"></div></div>
+<div class="form-row"><label for="s3_region"><b>Region</b></label><div class="ctrl"><input type="text" id="s3_region" value="us-east-1" autocomplete="off"></div></div>
+<div class="form-row"><label for="s3_bucket"><b>Bucket <span class="req" aria-hidden="true">*</span></b></label><div class="ctrl"><input type="text" id="s3_bucket" placeholder="Bucket-Name" autocomplete="off"></div></div>
+<div class="form-row"><label for="s3_access_key"><b>Zugangsschlüssel <span class="req" aria-hidden="true">*</span></b></label><div class="ctrl"><input type="text" id="s3_access_key" placeholder="Access Key ID" autocomplete="off"></div></div>
+<div class="form-row"><label for="s3_secret_key"><b>Geheimer Schlüssel <span class="req" aria-hidden="true">*</span></b><small>Wird nicht im Klartext angezeigt</small></label><div class="ctrl"><div class="pw-wrap"><input type="password" id="s3_secret_key" placeholder="Secret Access Key" autocomplete="current-password"><button class="pw-toggle" data-pw="s3_secret_key" type="button" aria-pressed="false" aria-label="Geheimen Schlüssel anzeigen"><svg class="icon icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></button></div></div></div>
+<div class="form-row"><label for="s3_path"><b>Unterverzeichnis</b><small>Optionaler Prefix im Bucket</small></label><div class="ctrl"><input type="text" id="s3_path" placeholder="unraid-containers" autocomplete="off"></div></div>
+</div>
+</div>
+<div class="settings-page hidden" id="tab-plan" role="tabpanel">
+<div class="section-title"><span data-ico="clock" aria-hidden="true"></span> Zeitplan (Cron, UTC)</div>
+<div class="form-row"><label for="schedule"><b>Cron-Ausdruck</b><small>Wann automatisch gesichert wird (UTC). Format: <code>Min Stunde Tag Monat Wochentag</code></small></label>
+<div class="ctrl"><input type="text" id="schedule" placeholder="0 3 * * *" autocomplete="off" aria-describedby="cronHint"><div class="preset-chips" id="schedulePresets" role="group" aria-label="Zeitplan-Presets"><button class="cron-preset" data-cron="0 3 * * *" type="button">Täglich 03:00</button><button class="cron-preset" data-cron="0 */6 * * *" type="button">Alle 6 Stunden</button><button class="cron-preset" data-cron="0 2 * * 0" type="button">Sonntags 02:00</button><button class="cron-preset" data-cron="0 22 * * 5" type="button">Freitags 22:00</button><button class="cron-preset" data-cron="0 1 */2 * *" type="button">Alle 2 Tage</button></div><div class="cron-hint" id="cronHint" aria-live="polite">Format: <code>Min Stunde Tag Monat Wochentag</code>, z. B. <code>0 3 * * *</code> (täglich 03:00 UTC).</div></div></div>
+<div class="section-title" style="margin-top:22px;"><span data-ico="layers" aria-hidden="true"></span> Aufbewahrung und Tempo</div>
+<div class="form-row"><label for="keep"><b>Backups pro Container behalten</b><small><code>0</code> = alle behalten; danach werden die ältesten automatisch gelöscht</small></label><div class="ctrl"><input type="number" id="keep" min="0" value="0" style="max-width:120px;"></div></div>
+<div class="form-row"><label for="parallel"><b>Parallele Backups</b><small>Mehrere Container gleichzeitig sichern - spart Zeit, braucht aber mehr CPU/I-O</small></label><div class="ctrl"><div class="range-row"><input type="range" id="parallel" min="1" max="8" value="2"><output id="parallelOut" for="parallel">2</output></div></div></div>
+<div class="form-row"><label for="bwlimit"><b>Bandbreitenlimit</b><small>rclone-Limit, leer = unbegrenzt. z. B. <code>8M</code>, <code>500K</code>, <code>off</code></small></label><div class="ctrl"><input type="text" id="bwlimit" placeholder="leer = unbegrenzt" style="max-width:220px;" autocomplete="off"></div></div>
+<div class="form-row"><label for="verify_upload"><b>Upload-Verifizierung</b><small>Größencheck des Backups auf dem Ziel nach dem Upload</small></label><div class="ctrl"><div class="toggle-row"><label class="switch"><input type="checkbox" id="verify_upload"><span class="slider" aria-hidden="true"></span><span class="sr-only">Upload prüfen</span></label><div><b>Upload prüfen</b><small>Empfohlen - erkennt abgebrochene/beschädigte Uploads</small></div></div></div></div>
+</div>
+<div class="settings-page hidden" id="tab-filters" role="tabpanel">
+<div class="section-title"><span data-ico="filter" aria-hidden="true"></span> Ausschlüsse</div>
+<div class="form-row"><label for="exclude"><b>Ausgeschlossene Container</b><small>Kommagetrennte Namen, die nie gesichert werden</small></label><div class="ctrl"><input type="text" id="exclude" placeholder="dockguard" autocomplete="off"><div class="hint">Standard: <code>dockguard,container-backup</code> (sich selbst nie sichern)</div></div></div>
+<div class="form-row"><label for="exclude_mounts"><b>Auszuschließende Mounts</b><small>Mounts, deren Quelle oder Ziel einen dieser Ausdrücke enthält (kommagetrennt)</small></label><div class="ctrl"><input type="text" id="exclude_mounts" placeholder="z. B. /cache" autocomplete="off"><div class="hint">Praxis-Tipp: große Caches wie <code>transcode</code> oder <code>cache</code> sparen Platz und Zeit</div></div></div>
+<div class="section-title" style="margin-top:22px;"><span data-ico="box" aria-hidden="true"></span> Unraid-Templates</div>
+<div class="form-row"><label for="templates_dir"><b>Template-Verzeichnis(se)</b><small>Wo die Community-Apps-Templates liegen (kommagetrennt). Beim Restore wird ins erste geschrieben.</small></label><div class="ctrl"><input type="text" id="templates_dir" placeholder="/boot/config/plugins/dockerMan/templates-user" autocomplete="off"></div></div>
+</div>
+<div class="settings-page hidden" id="tab-advanced" role="tabpanel">
+<div class="section-title"><span data-ico="settings" aria-hidden="true"></span> Server</div>
+<div class="form-row"><label for="web_port"><b>Web-Port</b><small>Port der Weboberfläche - wirkt erst nach Container-Neustart</small></label><div class="ctrl"><input type="number" id="web_port" min="1" max="65535" style="max-width:140px;"></div></div>
+<div class="form-row"><label for="rclone_timeout"><b>rclone-Timeout (Sekunden)</b><small>Maximale Dauer eines einzelnen rclone-Befehls (Upload/Download)</small></label><div class="ctrl"><input type="number" id="rclone_timeout" min="10" style="max-width:140px;"></div></div>
+<div class="section-title" style="margin-top:22px;"><span data-ico="hard-drive" aria-hidden="true"></span> Zielpfad</div>
+<div class="form-row"><label for="remotePreview"><b>Auflösung</b><small>So wird das Ziel aufgelöst (rclone-Remote)</small></label><div class="ctrl"><div class="remote-preview" id="remotePreview" aria-live="polite">-</div></div></div>
+<div class="section-title" style="margin-top:22px;"><span data-ico="shield" aria-hidden="true"></span> Hinweis</div>
+<div class="form-row"><label><b>Sicherheit</b><small>Der Container hat Zugriff auf den Docker-Socket und damit volle Kontrolle über den Host</small></label><div class="ctrl"><p class="hint">Den Web-Zugang ggf. per <code>WEB_USER</code>/<code>WEB_PASSWORD</code> (Umgebungsvariablen) absichern. Diese Werte sind bewusst nicht über die UI änderbar.</p></div></div>
+<div class="settings-actions"><button class="btn secondary" id="testBtn" type="button">Verbindung testen</button><button class="btn primary" id="saveBtn" type="button">Speichern</button><span class="settings-msg" id="settingsMsg" aria-live="polite"></span></div>
+</div>
+</div></section>
+<section id="page-jobs" class="page hidden" aria-label="Aufgaben"><div class="toolbar"><div class="chips" id="jobChips" role="group" aria-label="Aufgaben-Filter"><button class="chip active" data-filter="all" type="button">Alle</button><button class="chip" data-filter="running" type="button">Laufend</button><button class="chip" data-filter="done" type="button">Fertig</button><button class="chip" data-filter="error" type="button">Fehler</button></div><div style="flex:1"></div><label class="chip" style="cursor:pointer;" title="Automatisch nach unten scrollen"><input type="checkbox" id="autoScrollChk" checked style="accent-color:var(--accent);width:14px;height:14px;"> Auto-Scroll</label><button class="btn secondary sm" id="btnHideFinished" type="button" title="Blendet erledigte Jobs nur in dieser Ansicht aus - serverseitig bleiben sie erhalten">Erledigte ausblenden (nur Ansicht)</button></div><div class="jobs-list" id="jobsList" aria-live="polite"></div><div class="foot-pill" style="margin-top:12px;width:fit-content;">Server behält die letzten <b>&nbsp;200 Aufgaben&nbsp;</b> (Ringpuffer); Ausblenden wirkt nur lokal in dieser Ansicht.</div></section>
+</main>
+</div>
 <div id="modalRoot"></div>
-<div class="toasts" id="toasts"></div>
-
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+<div id="liveRegion" class="sr-only" aria-live="polite"></div>
 <script>
 "use strict";
-/* ============================ Icons ============================ */
-const ICON_PATHS = {
-  dashboard: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
-  box: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
-  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
-  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
-  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',
-  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',
-  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
-  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
-  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
-  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-  check: '<polyline points="20 6 9 17 4 12"/>',
-  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
-  "hard-drive": '<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/>',
-  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
-  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
-  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
-  server: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
-  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-  chev: '<path d="m6 9 6 6 6-6"/>',
-  filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
-  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
-  list: '<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',
-};
-function icon(name, cls) {
-  return `<svg class="icon ${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ICON_PATHS.info}</svg>`;
-}
-document.querySelectorAll("[data-ico]").forEach(el => { el.innerHTML = icon(el.dataset.ico); });
-
-/* ============================ State ============================ */
-const state = {
-  status: null, containers: null, backups: [], jobs: [],
-  page: "dashboard",
-  containerFilter: "all", containerSearch: "",
-  backupSearch: "", openGroups: new Set(),
-  jobFilter: "all", jobAutoScroll: true, expandedJobs: new Set(),
-  settingsLoaded: false, settingsTab: "target",
-};
-
-const PAGE_META = {
-  dashboard: ["Übersicht", "Status, Statistiken und letzte Aktivitäten auf einen Blick"],
-  containers: ["Container", "Alle Docker-Container mit ihrem Backup-Status"],
-  backups: ["Backups", "Verfügbare Backups im Speicher-Ziel – sichern, wiederherstellen oder löschen"],
-  settings: ["Einstellungen", "Speicher-Ziel, Zeitplan und Verhalten konfigurieren"],
-  jobs: ["Aufgaben", "Live-Log aller laufenden und vergangenen Jobs"],
-};
-
-/* ============================ Helfer ============================ */
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-
-async function api(path, opts = {}) {
-  const r = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  });
-  if (!r.ok) {
-    let detail = r.statusText;
-    try { detail = (await r.json()).detail || detail; } catch (e) { /* skip */ }
-    throw new Error(detail);
-  }
-  return r.json();
-}
-
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
-}
-
-function fmtSize(b) {
-  if (b == null || b === 0) return "–";
-  const u = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
-  return b.toFixed(b >= 10 || i === 0 ? 0 : 1) + " " + u[i];
-}
-
-function fmtTime(iso) {
-  if (!iso) return "–";
-  const d = new Date(iso);
-  return isNaN(d) ? "–" : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function backupTs(id) {
-  const m = /_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.tar$/.exec(id);
-  if (!m) return null;
-  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
-  return isNaN(d) ? null : d.getTime();
-}
-
-function backupEpochMs(b) {
-  if (b && b.mtime) {
-    const d = new Date(b.mtime);
-    if (!isNaN(d)) return d.getTime();
-  }
-  return backupTs(b.id) || 0;
-}
-
-function fmtAge(ms) {
-  if (!ms) return "–";
-  const diff = Date.now() - ms;
-  if (diff < 0) return "gerade eben";
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "gerade eben";
-  if (m < 60) return `vor ${m} Min.`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `vor ${h} Std.`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `vor ${d} Tagen`;
-  return new Date(ms).toLocaleDateString("de-DE");
-}
-
-function toast(msg, type = "ok", ms = 5000) {
-  const icons = { ok: "check", err: "alert", warn: "alert" };
-  const el = document.createElement("div");
-  el.className = "toast" + (type === "err" ? " err" : type === "warn" ? " warn" : "");
-  el.innerHTML = `<span class="icon ${icons[type]}">${icon(icons[type])}</span>
-    <div class="toast-msg">${esc(msg)}</div>
-    <button class="toast-close" onclick="this.parentElement.remove()">${icon("x")}</button>
-    <div class="toast-bar"></div>`;
-  $("#toasts").appendChild(el);
-  setTimeout(() => el.remove(), ms);
-  while ($("#toasts").children.length > 4) $("#toasts").firstChild.remove();
-}
-
-function confirmDialog({ title, body, confirmLabel = "Bestätigen", cancelLabel = "Abbrechen", danger = false, icon: ico = "alert" }) {
-  return new Promise(resolve => {
-    const root = $("#modalRoot");
-    root.innerHTML = `
-      <div class="modal-bg open" onclick="if(event.target===this)this.closest('.modal-bg')?.__resolve(false)">
-        <div class="modal" style="width:430px;">
-          <div class="modal-head">
-            <div class="modal-icon ${danger ? "danger" : "warn"}">${icon(ico)}</div>
-            <h3>${esc(title)}</h3>
-            <button class="modal-close" onclick="this.closest('.modal-bg').__resolve(false)">${icon("x")}</button>
-          </div>
-          <div class="modal-body">${body}</div>
-          <div class="modal-foot">
-            <button class="btn secondary" onclick="this.closest('.modal-bg').__resolve(false)">${esc(cancelLabel)}</button>
-            <button class="btn ${danger ? "danger" : "primary"}" onclick="this.closest('.modal-bg').__resolve(true)">${esc(confirmLabel)}</button>
-          </div>
-        </div>
-      </div>`;
-    const bg = root.querySelector(".modal-bg");
-    bg.__resolve = v => { bg.classList.remove("open"); root.innerHTML = ""; resolve(v); };
-    document.addEventListener("keydown", function h(e) {
-      if (e.key === "Escape") { document.removeEventListener("keydown", h); bg.__resolve(false); }
-    });
-  });
-}
-
-/* ============================ Navigation ============================ */
-function go(page) {
-  state.page = page;
-  $$(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.page === page));
-  $$(".page").forEach(s => s.classList.toggle("hidden", s.id !== "page-" + page));
-  $("#pageTitle").textContent = PAGE_META[page][0];
-  $("#pageSub").textContent = PAGE_META[page][1];
-  if (page === "containers") renderContainers();
-  if (page === "backups") renderBackups();
-  if (page === "jobs") renderJobs();
-  if (page === "settings" && !state.settingsLoaded) loadSettings();
-  if (page === "dashboard") renderDashboard();
-}
-
-/* ============================ API-Aufrufe ============================ */
-const lastFetch = { status: 0, containers: 0, backups: 0, jobs: 0 };
-
-async function refreshStatus(force = false) {
-  const now = Date.now();
-  if (!force && now - lastFetch.status < 25000) return state.status;
-  lastFetch.status = now;
-  try {
-    state.status = await api("/api/status");
-  } catch (e) {
-    state.status = null;
-    if (state.page === "dashboard") {
-      $("#dashStats").innerHTML = emptyState("alert", "API nicht erreichbar", esc(e.message));
-    }
-  }
-  renderSidebar();
-  if (state.page === "dashboard") renderDashboard();
-  return state.status;
-}
-
-async function refreshContainers(force = false) {
-  const now = Date.now();
-  if (!force && now - lastFetch.containers < 12000) return state.containers;
-  lastFetch.containers = now;
-  try {
-    state.containers = await api("/api/containers");
-  } catch (e) {
-    state.containers = null;
-    $("#containerGrid").innerHTML = emptyState("alert", "Docker nicht erreichbar", esc(e.message));
-  }
-  renderSidebar();
-  if (state.page === "containers") renderContainers();
-  return state.containers;
-}
-
-async function refreshBackups(force = false) {
-  const now = Date.now();
-  if (!force && now - lastFetch.backups < 25000) return state.backups;
-  lastFetch.backups = now;
-  try {
-    state.backups = await api("/api/backups");
-  } catch (e) {
-    state.backups = [];
-  }
-  renderSidebar();
-  if (state.page === "backups") renderBackups();
-  return state.backups;
-}
-
-async function refreshJobs(force = false) {
-  if (!force && Date.now() - lastFetch.jobs < 2500) return state.jobs;
-  lastFetch.jobs = Date.now();
-  try {
-    state.jobs = await api("/api/jobs");
-  } catch (e) { return state.jobs; }
-  renderSidebar();
-  if (state.page === "jobs" || state.page === "dashboard") { renderJobs(); renderDashboard(); }
-  return state.jobs;
-}
-
-function refreshAll(force = false) {
-  refreshStatus(force);
-  refreshContainers(force);
-  refreshBackups(force);
-  refreshJobs(force);
-}
-
-/* ============================ Sidebar ============================ */
-function renderSidebar() {
-  const s = state.status;
-  const foot = $("#footStorage");
-  if (!s) {
-    $("#footStorageDot").className = "dot warn";
-    $("#footStorageText").textContent = "Status unbekannt";
-  } else {
-    $("#footStorageDot").className = "dot " + (s.storage_ok ? "run" : "err");
-    $("#footStorageText").textContent = `${(s.storage_type || "?").toUpperCase()} ${s.storage_ok ? "erreichbar" : "nicht erreichbar"}`;
-    $("#footVersion").textContent = "v" + (s.version || "?");
-  }
-  const cs = state.containers;
-  const nb = $("#navContainersBadge");
-  if (cs) {
-    nb.textContent = cs.length;
-    nb.classList.toggle("hidden", !cs.length);
-  }
-  const bks = state.backups.reduce((n, g) => n + g.backups.length, 0);
-  const ab = $("#navBackupsBadge");
-  ab.textContent = bks;
-  ab.classList.toggle("hidden", !bks);
-  const runningJobs = state.jobs.filter(j => j.status === "running").length;
-  const jb = $("#navJobsBadge");
-  if (runningJobs) { jb.textContent = runningJobs + " läuft"; jb.className = "badge blue"; }
-  else { jb.textContent = ""; jb.className = "badge gray hidden"; }
-  document.title = runningJobs ? `(${runningJobs}) DockGuard – Unraid Container Backup` : "DockGuard – Unraid Container Backup";
-}
-
-function emptyState(ico, title, text) {
-  return `<div class="empty-state">${icon(ico)}<b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ""}</div>`;
-}
-
-/* ============================ Dashboard ============================ */
-function renderDashboard() {
-  const s = state.status;
-  const grid = $("#dashStats");
-  if (!s) {
-    grid.innerHTML = `<div class="stat-card" style="grid-column:1/-1"><div class="stat-val skeleton">Laden</div></div>`;
-    return;
-  }
-  const st = s.stats || {};
-  const runningCount = state.containers ? state.containers.filter(c => c.running).length : null;
-  const nextRun = s.next_run ? new Date(s.next_run) : null;
-  const lastTs = st.last_backup_ts ? new Date(st.last_backup_ts).getTime() : null;
-  const storageOk = s.storage_ok;
-
-  const setupHint = (!storageOk && !st.backups) ? `
-    <div class="setup-banner">
-      ${icon("settings")}
-      <div>
-        <b>Noch kein Speicher-Ziel konfiguriert</b>
-        <p>Richte in den Einstellungen dein Backup-Ziel ein (SMB-Share oder S3). DockGuard verbindet sich direkt aus dem Container – ohne Mounts oder Einrichtung auf dem Unraid-Host.</p>
-      </div>
-      <button class="btn primary" onclick="go('settings')">Jetzt einrichten</button>
-    </div>` : "";
-  $("#dashSetup").innerHTML = setupHint;
-
-  const cards = [
-    { ico: "box", label: "Container gesichert", val: String(st.containers ?? "–"),
-      sub: runningCount == null ? "Docker: n/a" : `${runningCount} laufen gerade`, icoCls: "box" },
-    { ico: "archive", label: "Backups", val: String(st.backups ?? "–"),
-      sub: `${fmtSize(st.total_bytes)} belegt`, icoCls: "archive" },
-    { ico: "clock", label: "Nächster Lauf", val: nextRun ? nextRun.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "–",
-      sub: nextRun ? nextRun.toLocaleDateString("de-DE") + " (UTC)" : `Cron: ${esc(s.schedule || "")}`, icoCls: "clock" },
-    { ico: "shield", label: "Letztes Backup", val: lastTs ? fmtAge(lastTs) : "noch keins",
-      sub: st.last_backup_container ? esc(st.last_backup_container) : "keine Daten", icoCls: "shield" },
-    { ico: "database", label: "Speicher-Ziel", val: (s.storage_type || "?").toUpperCase(),
-      sub: storageOk ? "erreichbar" : "nicht erreichbar", ok: storageOk, icoCls: "database" },
-    { ico: "layers", label: "Upload-Verifizierung", val: s.verify_uploads ? "aktiv" : "aus",
-      sub: "atomarer Upload (.part)", icoCls: "layers" },
-  ];
-  grid.innerHTML = cards.map(c => `
-    <div class="stat-card">
-      <div class="stat-icon">${icon(c.icoCls || c.ico)}</div>
-      <div class="stat-label">${c.label}</div>
-      <div class="stat-val">${c.val}</div>
-      <div class="stat-sub">${c.sub.includes("nicht erreichbar") ? `<span class="dot err" style="vertical-align:1px;margin-right:5px;"></span>` : c.ico === "box" ? `<span class="dot run" style="vertical-align:1px;margin-right:5px;"></span>` : ""}${c.sub}</div>
-    </div>`).join("");
-
-  const jobsEl = $("#dashJobs");
-  const recent = state.jobs.slice(0, 6);
-  if (!recent.length) {
-    jobsEl.innerHTML = emptyState("list", "Noch keine Aufgaben", "Starte ein Backup oder warte auf den geplanten Lauf – hier erscheint das Live-Log.");
-  } else {
-    jobsEl.innerHTML = recent.map(j => `
-      <div class="job-card ${j.status}" style="margin-bottom:10px;">
-        <div class="job-head" style="cursor:default;">
-          <div class="job-icon ${esc(j.kind || "job")}">${icon(j.kind === "restore" ? "download" : j.kind === "scheduled" ? "clock" : "zap")}</div>
-          <div class="job-main">
-            <b>${esc(j.title)}</b>
-            <div class="job-sub">${fmtTime(j.started)} · ${j.duration != null ? j.duration + " s" : "läuft …"}</div>
-          </div>
-          <span class="badge job-badge ${j.status === "running" ? "yellow" : j.status === "done" ? "green" : "red"}">${j.status === "running" ? "läuft" : j.status === "done" ? "fertig" : "Fehler"}</span>
-        </div>
-        ${j.error ? `<div class="job-error">${esc(j.error)}</div>` : ""}
-      </div>`).join("");
-  }
-}
-
-/* ============================ Container ============================ */
-function setContainerFilter(f) {
-  state.containerFilter = f;
-  $$("#containerChips .chip").forEach(c => c.classList.toggle("active", c.dataset.filter === f));
-  renderContainers();
-}
-
-function renderContainers() {
-  const grid = $("#containerGrid");
-  const list = state.containers;
-  if (list === null) {
-    grid.innerHTML = `<div class="stat-card skeleton" style="grid-column:1/-1;padding:40px;">Lade Container …</div>`;
-    return;
-  }
-  if (!list.length) {
-    grid.innerHTML = emptyState("box", "Keine Container gefunden", "Der Docker-Socket ist verbunden, aber es wurden keine Container gemeldet.");
-    return;
-  }
-  const q = state.containerSearch.trim().toLowerCase();
-  let filtered = list.filter(c =>
-    (state.containerFilter === "all" ||
-      (state.containerFilter === "running" && c.running) ||
-      (state.containerFilter === "stopped" && !c.running)) &&
-    (!q || c.name.toLowerCase().includes(q) || (c.image || "").toLowerCase().includes(q))
-  );
-  $("#chipAll").textContent = list.length;
-  $("#chipRun").textContent = list.filter(c => c.running).length;
-  $("#chipStop").textContent = list.filter(c => !c.running).length;
-
-  if (!filtered.length) {
-    grid.innerHTML = emptyState("search", "Keine Treffer", "Kein Container passt zu Filter oder Suchbegriff.");
-    return;
-  }
-
-  const stateDot = c => c.running ? "run" : (c.state === "exited" || c.state === "dead" ? "stop" : "warn");
-  const stateLabel = c => c.running ? "läuft" : c.state;
-  const stateBadge = c => c.running ? "green" : (c.state === "exited" || c.state === "dead" ? "gray" : "yellow");
-
-  grid.innerHTML = filtered.map(c => {
-    const lastTs = c.last_backup ? backupTs(c.last_backup) : null;
-    return `
-    <div class="c-card">
-      <div class="c-head">
-        <span class="dot ${stateDot(c)}"></span>
-        <div class="c-title">
-          <b>${esc(c.name)}</b>
-          <span class="c-image">${esc(c.image || "?")}</span>
-        </div>
-        <span class="badge ${stateBadge(c)}"><span class="dot"></span>${esc(stateLabel(c))}</span>
-      </div>
-      <div class="c-meta">
-        <div class="c-meta-item">${icon("layers")} <b>${c.backup_count || 0}</b> Backups</div>
-        <div class="c-meta-item">${icon("clock")} ${c.last_backup ? fmtAge(lastTs) : "kein Backup"}</div>
-        <div class="c-meta-item">${icon("hard-drive")} ${c.last_backup_size ? fmtSize(c.last_backup_size) : "–"}</div>
-      </div>
-      <div class="c-actions">
-        <button class="btn sm primary" onclick="startBackupOne('${esc(c.name)}')" ${c.running ? "" : ""}>${icon("zap")} Sichern</button>
-        <button class="btn sm secondary" onclick="openRestoreFor('${esc(c.name)}')" ${c.backup_count ? "" : "disabled title='Noch keine Backups vorhanden'"}>${icon("download")} Wiederherstellen</button>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-async function startBackupOne(name) {
-  try {
-    await api("/api/backup", { method: "POST", body: JSON.stringify({ containers: [name] }) });
-    toast(`Backup von '${name}' gestartet`, "ok");
-    go("jobs");
-    refreshJobs(true);
-  } catch (e) { toast(e.message, "err"); }
-}
-
-async function startBackupAll() {
-  const btn = $("#btnBackupAllTop");
-  btn.disabled = true;
-  try {
-    await api("/api/backup", { method: "POST", body: JSON.stringify({ all: true }) });
-    toast("Backup aller Container gestartet", "ok");
-    go("jobs");
-    refreshJobs(true);
-  } catch (e) { toast(e.message, "err"); }
-  finally { btn.disabled = false; }
-}
-
-/* ============================ Backups ============================ */
-function expandAll(open) {
-  const groups = state.backups.map(g => g.container).filter(c => c);
-  groups.forEach(c => open ? state.openGroups.add(c) : state.openGroups.delete(c));
-  $("#btnExpandAll").classList.toggle("hidden", open);
-  $("#btnCollapseAll").classList.toggle("hidden", !open);
-  renderBackups();
-}
-
-function toggleGroup(name) {
-  if (state.openGroups.has(name)) state.openGroups.delete(name);
-  else state.openGroups.add(name);
-  renderBackups();
-}
-
-function renderBackups() {
-  const root = $("#backupGroups");
-  if (!state.backups.length) {
-    root.innerHTML = emptyState("archive", "Noch keine Backups vorhanden",
-      "Backups erscheinen hier, sobald mindestens ein Container gesichert wurde – entweder über die Schaltflächen oben oder automatisch durch den Zeitplan.");
-    return;
-  }
-  const q = state.backupSearch.trim().toLowerCase();
-  const groups = state.backups
-    .map(g => ({ ...g, backups: g.backups.filter(b => !q || g.container.toLowerCase().includes(q) || b.id.toLowerCase().includes(q)) }))
-    .filter(g => g.backups.length)
-    .sort((a, b) => {
-      const at = a.backups.reduce((m, x) => Math.max(m, backupEpochMs(x)), 0);
-      const bt = b.backups.reduce((m, x) => Math.max(m, backupEpochMs(x)), 0);
-      return bt - at;
-    });
-
-  if (!groups.length) {
-    root.innerHTML = emptyState("search", "Keine Treffer", "Kein Backup passt zur Suche oder es sind keine Backups vorhanden.");
-    return;
-  }
-
-  root.innerHTML = groups.map(g => {
-    const open = state.openGroups.has(g.container);
-    const hasNewer = g.backups.length > 1;
-    return `
-    <div class="b-group ${open ? "open" : ""}">
-      <button class="b-group-head" onclick="toggleGroup('${esc(g.container)}')">
-        <span class="dot ${open ? "run" : ""}"></span>
-        <b>${esc(g.container)}</b>
-        <span class="g-count">${g.backups.length} ${g.backups.length === 1 ? "Backup" : "Backups"}</span>
-        ${icon("chev", "chev")}
-      </button>
-      <div class="b-group-body">
-        <table class="data">
-          <thead><tr><th>Backup</th><th>Größe</th><th>Alter</th><th style="text-align:right;">Aktionen</th></tr></thead>
-          <tbody>
-            ${[...g.backups].reverse().map(b => {
-              const ts = backupEpochMs(b);
-              return `
-              <tr>
-                <td><span class="bk-id" title="${esc(b.id)}">${esc(b.id)}</span></td>
-                <td>${fmtSize(b.size)}</td>
-                <td>${fmtAge(ts)}</td>
-                <td>
-                  <div class="row-actions">
-                    <button class="icon-btn" onclick="openRestoreFor('${esc(g.container)}','${esc(b.id)}')" title="Wiederherstellen">${icon("download")} Restore</button>
-                    <button class="icon-btn danger" onclick="deleteBackup('${esc(g.container)}','${esc(b.id)}')" title="Backup löschen">${icon("trash")}</button>
-                  </div>
-                </td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-async function deleteBackup(container, backupId) {
-  const ok = await confirmDialog({
-    title: "Backup löschen",
-    danger: true, icon: "trash",
-    body: `<div class="kv"><dt>Container</dt><dd>${esc(container)}</dd><dt>Backup</dt><dd>${esc(backupId)}</dd></div>
-      <div class="warn-box">${icon("alert")}<span>Dieses Backup wird <b>unwiderruflich</b> vom Speicher-Ziel gelöscht. Ein Wiederherstellen ist danach nicht mehr möglich.</span></div>`,
-    confirmLabel: "Endgültig löschen",
-  });
-  if (!ok) return;
-  try {
-    await api(`/api/backups/${encodeURIComponent(container)}/${encodeURIComponent(backupId)}`, { method: "DELETE" });
-    toast(`Backup '${backupId}' gelöscht`, "ok");
-    refreshBackups(true); refreshStatus(true);
-  } catch (e) { toast(e.message, "err"); }
-}
-
-/* ============================ Restore-Modal ============================ */
-function openRestoreFor(container, presetBackupId) {
-  const group = state.backups.find(g => g.container === container);
-  if (!group || !group.backups.length) { toast(`Für '${container}' gibt es keine Backups`, "warn"); return; }
-  const opts = [...group.backups].reverse().map(b => {
-    const ts = backupEpochMs(b);
-    return `<option value="${esc(b.id)}">${esc(b.id)} (${fmtSize(b.size)}, ${fmtAge(ts)})</option>`;
-  }).join("");
-  const containerInfo = state.containers ? state.containers.find(c => c.name === container) : null;
-  const running = containerInfo ? containerInfo.running : false;
-
-  const root = $("#modalRoot");
-  root.innerHTML = `
-    <div class="modal-bg open" onclick="if(event.target===this)this.__resolve(false)">
-      <div class="modal">
-        <div class="modal-head">
-          <div class="modal-icon warn">${icon("download")}</div>
-          <h3>Container wiederherstellen</h3>
-          <button class="modal-close" onclick="this.closest('.modal-bg').__resolve(false)">${icon("x")}</button>
-        </div>
-        <div class="modal-body">
-          <div class="kv">
-            <dt>Container</dt><dd>${esc(container)}</dd>
-            <dt>Backup</dt><dd style="display:flex;flex-direction:column;gap:6px;"><select id="restoreBackupSel" style="width:100%;">${opts}</select></dd>
-          </div>
-          <div class="warn-box">${icon("alert")}<span>Vorhandene Daten an den Originalpfaden werden überschrieben${running ? " – der Container läuft aktuell und wird ersetzt" : ""}.</span></div>
-          <label class="checkbox"><input type="checkbox" id="restoreOverwriteChk" ${running ? "checked" : ""}>
-            <span><b>Bestehenden Container ersetzen</b><br>Überschreibt Daten und legt den Container neu an (inkl. Image, Ports, Env, Netzwerk, Template).</span></label>
-        </div>
-        <div class="modal-foot">
-          <button class="btn secondary" onclick="this.closest('.modal-bg').__resolve(false)">Abbrechen</button>
-          <button class="btn primary" onclick="confirmRestoreModal('${esc(container)}', '${esc(presetBackupId || "")}')">${icon("download")} Wiederherstellen</button>
-        </div>
-      </div>
-    </div>`;
-  const bg = root.querySelector(".modal-bg");
-  bg.__resolve = v => { bg.classList.remove("open"); root.innerHTML = ""; };
-  if (presetBackupId) $("#restoreBackupSel").value = presetBackupId;
-}
-
-async function confirmRestoreModal(container, presetBackupId) {
-  const backupId = $("#restoreBackupSel") ? $("#restoreBackupSel").value : (presetBackupId || null);
-  const overwrite = $("#restoreOverwriteChk") ? $("#restoreOverwriteChk").checked : false;
-  $("#modalRoot").innerHTML = "";
-  try {
-    await api("/api/restore", { method: "POST", body: JSON.stringify({ container, backup_id: backupId, overwrite }) });
-    toast(`Wiederherstellung von '${container}' gestartet`, "ok");
-    go("jobs");
-    refreshJobs(true);
-  } catch (e) { toast(e.message, "err"); }
-}
-
-/* ============================ Aufgaben / Jobs ============================ */
-function setJobFilter(f) {
-  state.jobFilter = f;
-  $$("#page-jobs .chips .chip").forEach(c => c.classList.toggle("active", c.dataset.filter === f));
-  renderJobs();
-}
-
-function toggleJob(id) {
-  if (state.expandedJobs.has(id)) state.expandedJobs.delete(id);
-  else state.expandedJobs.add(id);
-  renderJobs();
-}
-
-function clearFinishedJobs() {
-  state.jobs = state.jobs.filter(j => j.status === "running");
-  renderJobs();
-}
-
-function renderJobs() {
-  const list = $("#jobsList");
-  let jobs = state.jobs.filter(j =>
-    state.jobFilter === "all" || j.status === state.jobFilter);
-  jobs = [...jobs].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1) || b.started.localeCompare(a.started));
-
-  if (!jobs.length) {
-    list.innerHTML = emptyState(
-      state.jobFilter === "all" ? "terminal" : "search",
-      state.jobFilter === "all" ? "Keine Aufgaben" : "Keine passenden Aufgaben",
-      state.jobFilter === "all" ? "Gestartete Backups und Wiederherstellungen erscheinen hier mit Live-Log." : "Für diesen Filter gibt es gerade nichts."
-    );
-    return;
-  }
-
-  const wasAtBottom = state.jobAutoScroll && list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-  list.innerHTML = jobs.map(j => {
-    const open = j.status === "running" || state.expandedJobs.has(j.id);
-    const logHtml = j.log && j.log.length
-      ? `<pre class="job-log">${esc(j.log.slice(-200).join("\n"))}</pre>` : "";
-    const errHtml = j.error ? `<div class="job-error">${
-      /* Fehlerzeilen einzeln brechen */
-      esc(String(j.error).split("\n").join("\n"))
-    }</div>` : "";
-    return `
-    <div class="job-card ${j.status} ${open ? "open" : ""}" id="job-${j.id}">
-      <div class="job-head" onclick="toggleJob('${j.id}')">
-        <div class="job-icon ${esc(j.kind || "job")}">${icon(j.kind === "restore" ? "download" : j.kind === "scheduled" ? "clock" : "zap")}</div>
-        <div class="job-main">
-          <b>${esc(j.title)}</b>
-          <div class="job-sub">gestartet ${fmtTime(j.started)}${j.finished ? " · beendet " + fmtTime(j.finished) : ""}${j.duration != null ? " · Dauer " + j.duration + " s" : ""}</div>
-        </div>
-        <span class="badge job-badge ${j.status === "running" ? "yellow" : j.status === "done" ? "green" : "red"}">${j.status === "running" ? "läuft …" : j.status === "done" ? "fertig" : "Fehler"}</span>
-        ${icon("chev", "job-chev")}
-      </div>
-      ${errHtml}
-      ${logHtml}
-    </div>`;
-  }).join("");
-
-  const anchor = document.getElementById("job-" + (jobs[0] && jobs[0].id));
-  if (state.jobAutoScroll && wasAtBottom && anchor) list.scrollTop = list.scrollHeight;
-}
-
-/* ============================ Einstellungen ============================ */
-const SETTINGS_NUMERIC = ["smb_port", "keep", "web_port", "rclone_timeout", "parallel"];
-const SETTINGS_FIELDS = [
-  "backup_type",
-  "smb_host", "smb_port", "smb_user", "smb_pass", "smb_share", "smb_path",
-  "s3_provider", "s3_endpoint", "s3_region", "s3_bucket",
-  "s3_access_key", "s3_secret_key", "s3_path",
-  "schedule", "keep", "web_port", "exclude", "exclude_mounts",
-  "templates_dir", "rclone_timeout", "parallel", "bwlimit", "verify_upload",
-];
-
-function setSettingsTab(tab) {
-  state.settingsTab = tab;
-  $$("#settingsNav button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  ["target", "plan", "filters", "advanced"].forEach(t =>
-    $("#tab-" + t).classList.toggle("hidden", t !== tab));
-}
-
-function setBackupType(t) {
-  $("#backup_type").value = t;
-  $$("#typeTiles .tile").forEach(el => el.classList.toggle("sel", el.dataset.type === t));
-  $("#settings-smb").classList.toggle("hidden", t !== "smb");
-  $("#settings-s3").classList.toggle("hidden", t !== "s3");
-  updateRemotePreview();
-}
-
-function togglePw(id, btn) {
-  const inp = $("#" + id);
-  inp.type = inp.type === "password" ? "text" : "password";
-  btn.classList.toggle("off", inp.type === "text");
-}
-
-function syncPreset() {
-  const v = $("#schedule").value.trim();
-  $$("#schedulePresets .cron-preset").forEach(p =>
-    p.classList.toggle("active", p.dataset.cron === v));
-}
-
-function setSchedule(btn) {
-  $("#schedule").value = btn.dataset.cron;
-  syncPreset();
-}
-
-function updateRemotePreview() {
-  const t = $("#backup_type").value;
-  const g = t === "smb"
-    ? `backup:${$("#smb_share").value || "…"}/${$("#smb_path").value}`
-    : `backup:${$("#s3_bucket").value || "…"}/${$("#s3_path").value}`;
-  $("#remotePreview").textContent = g.replace(/\/+$/, "");
-}
-
-function fillSettings(s) {
-  for (const f of SETTINGS_FIELDS) {
-    const el = $("#" + f);
-    if (el && s[f] !== undefined && s[f] !== null) {
-      if (f === "verify_upload") el.checked = !!s[f];
-      else {
-        el.value = s[f];
-        if (f === "parallel") $("#parallelOut").value = s[f];
-      }
-    }
-  }
-  setBackupType(s.backup_type);
-  syncPreset();
-  settingsMsg("");
-}
-
-function collectSettings() {
-  const out = {};
-  for (const f of SETTINGS_FIELDS) {
-    const el = $("#" + f);
-    if (!el) continue;
-    if (f === "verify_upload") out[f] = el.checked;
-    else {
-      let v = el.value.trim();
-      if (SETTINGS_NUMERIC.includes(f)) v = v === "" ? "" : parseInt(v, 10);
-      out[f] = v;
-    }
-  }
-  return out;
-}
-
-function settingsMsg(text, isErr) {
-  const el = $("#settingsMsg");
-  if (!text || !text.trim()) { el.innerHTML = ""; return; }
-  el.innerHTML = `${icon(isErr ? "alert" : "check")} ${esc(text)}`;
-  el.className = "settings-msg " + (isErr ? "err" : "ok");
-}
-
-async function loadSettings() {
-  try {
-    const s = await api("/api/settings");
-    fillSettings(s);
-    state.settingsLoaded = true;
-  } catch (e) {
-    settingsMsg("Einstellungen konnten nicht geladen werden: " + e.message, true);
-  }
-}
-
-async function testConnection() {
-  settingsMsg("Teste Verbindung …");
-  const btn = $("#testBtn");
-  btn.classList.add("loading"); btn.disabled = true;
-  try {
-    const r = await api("/api/settings/test", { method: "POST", body: JSON.stringify(collectSettings()) });
-    settingsMsg(r.ok ? "Verbindung erfolgreich – Ziel erreichbar" : "Ziel nicht erreichbar – Zugangsdaten und Netzwerk prüfen", !r.ok);
-    if (r.ok) toast("Verbindung zum Speicher-Ziel erfolgreich", "ok");
-  } catch (e) {
-    settingsMsg(e.message, true);
-  } finally {
-    btn.classList.remove("loading"); btn.disabled = false;
-  }
-}
-
-async function saveSettings() {
-  settingsMsg("Speichere …");
-  const btn = $("#saveBtn");
-  btn.classList.add("loading"); btn.disabled = true;
-  try {
-    const r = await api("/api/settings", { method: "POST", body: JSON.stringify(collectSettings()) });
-    fillSettings(r.settings);
-    settingsMsg(r.storage_ok ? "Gespeichert – Speicher-Ziel erreichbar" : "Gespeichert – Speicher-Ziel aktuell nicht erreichbar", !r.storage_ok);
-    toast("Einstellungen gespeichert", r.storage_ok ? "ok" : "warn");
-    refreshStatus(true); refreshBackups(true);
-  } catch (e) {
-    settingsMsg(e.message, true);
-  } finally {
-    btn.classList.remove("loading"); btn.disabled = false;
-  }
-}
-
-/* ============================ Init ============================ */
-document.querySelectorAll(".nav-item").forEach(b =>
-  b.addEventListener("click", () => go(b.dataset.page)));
-
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") {
-    const m = $("#modalRoot .modal-bg.open");
-    if (m && m.__resolve) m.__resolve(false);
-  }
-});
-
-setInterval(() => {
-  if (document.hidden) return;
-  refreshJobs();
-  refreshStatus();
-  refreshContainers();
-  refreshBackups();
-}, 8000);
-
-setInterval(() => {
-  if (document.hidden) return;
-  if (state.page === "containers") renderContainers();
-  if (state.page === "backups") renderBackups();
-  if (state.page === "dashboard") renderDashboard();
-}, 30000);
-
-go("dashboard");
-refreshAll(true);
-loadSettings().catch(() => {});
+/* DockGuard UI - Single File, keine externen Abhängigkeiten. */
+/* Architektur: apiClient (Timeout+Retry+i18n) | settingsStore (SoT) | dataStore | jobStore | Tick-Coordinator | ModalManager | ToastManager | reine Render-Funktionen pro Seite. */
+var ICON_PATHS={dashboard:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',box:'<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',archive:'<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',terminal:'<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',play:'<polygon points="6 3 20 12 6 21 6 3"/>',download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',trash:'<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',check:'<polyline points="20 6 9 17 4 12"/>',alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',"hard-drive":'<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/>',clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',layers:'<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',database:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',server:'<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',chev:'<path d="m6 9 6 6 6-6"/>',filter:'<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',list:'<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>',copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'};
+function icon(name,cls){return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICON_PATHS[name]||ICON_PATHS.info)+'</svg>';}
+function qs(s,r){return (r||document).querySelector(s);}
+function qsa(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtSize(b){if(b==null||b===''||isNaN(Number(b))||Number(b)<=0)return '\u2013';var n=Number(b);var u=['B','KB','MB','GB','TB'];var i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return n.toFixed(n>=10||i===0?0:1)+' '+u[i];}
+function fmtTime(iso){if(!iso)return '\u2013';var d=new Date(iso);if(isNaN(d.getTime()))return '\u2013';try{return d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return d.toISOString();}}
+function fmtAge(ms){if(ms==null||isNaN(Number(ms))||Number(ms)<=0)return '\u2013';var t=Number(ms);var diff=Date.now()-t;if(diff<0)diff=0;var m=Math.floor(diff/60000);if(m<1)return 'gerade eben';if(m<60)return 'vor '+m+' Min.';var h=Math.floor(m/60);if(h<24)return 'vor '+h+' Std.';var d=Math.floor(h/24);if(d<30)return 'vor '+d+' Tagen';try{return new Date(t).toLocaleDateString('de-DE');}catch(e){return '\u2013';}}
+function backupTs(id){if(!id||typeof id!=='string')return null;var m=/_([0-9]{4})([0-9]{2})([0-9]{2})_([0-9]{2})([0-9]{2})([0-9]{2})\.tar$/.exec(id);if(!m)return null;var d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]));return isNaN(d.getTime())?null:d.getTime();}
+function backupEpochMs(b){try{if(!b||typeof b!=='object')return 0;if(b.mtime){var d=new Date(b.mtime);if(!isNaN(d.getTime()))return d.getTime();}if(b.id){var t=backupTs(b.id);if(t)return t;}return 0;}catch(e){return 0;}}
+function prefersReducedMotion(){try{return window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}}
+function announce(msg){var el=qs('#liveRegion');if(el)el.textContent=String(msg||'');}
+var API_TIMEOUT_MS=15000;
+function friendlyError(status,detail){var d=String(detail||'');if(status===0)return 'Server nicht erreichbar \u2013 ist der Container gestartet und der Port korrekt?';if(status===401||status===403)return 'Zugriff verweigert (HTTP '+status+'). Hinweis: WEB_USER/WEB_PASSWORD in den Umgebungsvariablen prüfen und Seite neu laden.'+(d?' Details: '+d:'');if(status===404)return 'Nicht gefunden (404). '+(d||'Bitte Seite neu laden.');if(status===400)return 'Ungültige Anfrage: '+(d||'Eingaben prüfen.');if(status===502||status===503)return 'Dienst vorübergehend nicht verfügbar ('+status+'): '+(d||'Docker- oder Speicher-Ziel prüfen.');if(status>=500)return 'Serverfehler ('+status+'): '+(d||'Logs des Containers prüfen.');return d||('Fehler '+status);}
+function fetchWithTimeout(path,opts,timeoutMs){var ctrl=new AbortController();var t=setTimeout(function(){ctrl.abort();},timeoutMs||API_TIMEOUT_MS);var merged={headers:{'Content-Type':'application/json'}};if(opts){for(var k in opts){merged[k]=opts[k];}if(opts.headers){merged.headers=Object.assign({'Content-Type':'application/json'},opts.headers);}}merged.signal=ctrl.signal;return fetch(path,merged).then(function(r){clearTimeout(t);return r;},function(e){clearTimeout(t);throw e;});}
+function apiError(status,detail){var err=new Error(friendlyError(status,detail));err.status=status;err.detail=detail;return err;}
+function api(path,opts){opts=opts||{};var method=(opts.method||'GET').toUpperCase();var retries=(method==='GET')?1:0;
+function attempt(n){return fetchWithTimeout(path,opts).then(function(r){if(!r.ok){return r.text().then(function(txt){var detail='';try{var j=JSON.parse(txt);detail=j.detail||j.error||txt||r.statusText;}catch(e){detail=txt||r.statusText;}throw apiError(r.status,detail);});}var ct=r.headers.get('content-type')||'';if(ct.indexOf('application/json')===-1){return r.text().then(function(t){try{return JSON.parse(t);}catch(e){return {};}});}return r.json();},function(e){if(e&&e.name==='AbortError')throw apiError(0,'Zeitüberschreitung nach '+(API_TIMEOUT_MS/1000)+'s');throw apiError(0,(e&&e.message)||'Netzwerkfehler');}).catch(function(e){if(n<retries&&(e.status===0||e.status>=500)){var wait=prefersReducedMotion()?50:350;return new Promise(function(res){setTimeout(res,wait);}).then(function(){return attempt(n+1);});}throw e;});}
+return attempt(0);}
+var ToastManager={max:3,dedupWindowMs:2500,recent:[],show:function(msg,type,ms){msg=String(msg||'').trim();if(!msg)return;type=(type==='err'||type==='warn')?type:'ok';var now=Date.now();this.recent=this.recent.filter(function(r){return now-r.t<2500;});for(var i=0;i<this.recent.length;i++){if(this.recent[i].msg===msg&&this.recent[i].type===type)return;}this.recent.push({msg:msg,type:type,t:now});var box=qs('#toasts');if(!box)return;while(box.children.length>=this.max){box.removeChild(box.firstChild);}var icons={ok:'check',err:'alert',warn:'alert'};var el=document.createElement('div');el.className='toast'+(type==='err'?' err':type==='warn'?' warn':'');el.setAttribute('role',type==='err'?'alert':'status');var ic=document.createElement('span');ic.innerHTML=icon(icons[type]||'check');var m=document.createElement('div');m.className='toast-msg';m.textContent=msg;var c=document.createElement('button');c.className='toast-close';c.type='button';c.setAttribute('aria-label','Mitteilung schließen');c.innerHTML=icon('x');c.addEventListener('click',function(){if(el.parentNode)el.parentNode.removeChild(el);});var bar=document.createElement('div');bar.className='toast-bar';if(prefersReducedMotion())bar.style.animation='none';el.appendChild(ic);el.appendChild(m);el.appendChild(c);el.appendChild(bar);box.appendChild(el);announce(msg);var dur=ms||5000;setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},dur);}};
+function toast(msg,type,ms){ToastManager.show(msg,type,ms);}
+var ModalManager={stack:[],open:function(opts){var self=this;opts=opts||{};return new Promise(function(resolve){var root=qs('#modalRoot');var bg=document.createElement('div');bg.className='modal-bg open';bg.setAttribute('role','dialog');bg.setAttribute('aria-modal','true');if(opts.label)bg.setAttribute('aria-label',opts.label);var modal=document.createElement('div');modal.className='modal';if(opts.width)modal.style.width=opts.width;modal.innerHTML=opts.html||'';bg.appendChild(modal);root.appendChild(bg);var entry={bg:bg,modal:modal,resolve:resolve,prevFocus:document.activeElement,onClose:opts.onClose};self.stack.push(entry);bg.addEventListener('mousedown',function(e){if(e.target===bg&&opts.dismissable!==false)self.close(entry,false);});qsa('[data-close]',modal).forEach(function(b){b.addEventListener('click',function(){self.close(entry,false);});});if(opts.onMount){try{opts.onMount(modal,entry);}catch(e){}}self.trap(modal);var f=modal.querySelector('[data-autofocus]')||modal.querySelector('button,select,input,[tabindex]');if(f){try{f.focus();}catch(e){}}});},close:function(entry,val){var i=this.stack.indexOf(entry);if(i===-1)return;var only=this.stack[i];this.stack.splice(i,1);try{if(only.bg.parentNode)only.bg.parentNode.removeChild(only.bg);}catch(e){}try{if(only.onClose)only.onClose(val);}catch(e){}try{if(only.prevFocus&&only.prevFocus.focus)only.prevFocus.focus();}catch(e){}only.resolve(val);},closeTop:function(val){if(this.stack.length)this.close(this.stack[this.stack.length-1],val);},closeAll:function(){while(this.stack.length)this.close(this.stack[this.stack.length-1],false);},trap:function(modal){var self=this;modal.addEventListener('keydown',function(e){if(e.key!=='Tab')return;var els=qsa('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',modal).filter(function(el){return !el.disabled&&el.offsetParent!==null;});if(!els.length)return;var first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}});}};
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ModalManager.stack.length){e.stopPropagation();ModalManager.closeTop(false);}});
+function confirmDialog(o){o=o||{};var bodyHtml=o.body||'';var html='<div class="modal-head"><div class="modal-icon '+(o.danger?'danger':'warn')+'">'+icon(o.icon||'alert')+'</div><h3>'+esc(o.title||'Bestätigen')+'</h3><button class="modal-close" data-close type="button" aria-label="Schließen">'+icon('x')+'</button></div><div class="modal-body">'+bodyHtml+'</div><div class="modal-foot"><button class="btn secondary" data-close type="button">'+esc(o.cancelLabel||'Abbrechen')+'</button><button class="btn '+(o.danger?'danger':'primary')+'" data-ok type="button">'+esc(o.confirmLabel||'Bestätigen')+'</button></div>';return ModalManager.open({label:o.title||'Bestätigen',html:html,onMount:function(modal,entry){var ok=modal.querySelector('[data-ok]');if(ok){ok.setAttribute('data-autofocus','1');try{ok.focus();}catch(e){} ok.addEventListener('click',function(){ModalManager.close(entry,true);});}}});}
+var SECRET_MASK='********';
+var DEFAULT_SETTINGS={backup_type:'smb',smb_host:'',smb_port:445,smb_user:'',smb_pass:'',smb_share:'',smb_path:'',s3_provider:'AWS',s3_endpoint:'',s3_region:'us-east-1',s3_bucket:'',s3_access_key:'',s3_secret_key:'',s3_path:'',schedule:'0 3 * * *',keep:0,web_port:8080,exclude:'',exclude_mounts:'',templates_dir:'',rclone_timeout:7200,parallel:2,bwlimit:'',verify_upload:true};
+var NUMERIC_FIELDS=['smb_port','keep','web_port','rclone_timeout','parallel'];
+var ALL_FIELDS=['backup_type','smb_host','smb_port','smb_user','smb_pass','smb_share','smb_path','s3_provider','s3_endpoint','s3_region','s3_bucket','s3_access_key','s3_secret_key','s3_path','schedule','keep','web_port','exclude','exclude_mounts','templates_dir','rclone_timeout','parallel','bwlimit','verify_upload'];
+var settingsStore={data:Object.assign({},DEFAULT_SETTINGS),loaded:false,dirty:false,set:function(k,v){this.data[k]=v;this.dirty=true;},setType:function(t){t=(t==='s3')?'s3':'smb';this.data.backup_type=t;this.dirty=true;syncTypeTiles();updateRemotePreview();},fromServer:function(s){for(var i=0;i<ALL_FIELDS.length;i++){var f=ALL_FIELDS[i];if(s[f]!==undefined&&s[f]!==null)this.data[f]=s[f];}if(this.data.backup_type!=='smb'&&this.data.backup_type!=='s3')this.data.backup_type='smb';this.loaded=true;this.dirty=false;}};
+var dataStore={status:null,containers:null,backups:[],lastError:{status:null,containers:null,backups:null,jobs:null}};
+var jobStore={jobs:[],hiddenFinished:false,expanded:{},loaded:false,set:function(list){this.jobs=Array.isArray(list)?list:[];},visible:function(filter){var self=this;return this.jobs.filter(function(j){if(self.hiddenFinished&&j.status!=='running')return false;if(filter&&filter!=='all'&&j.status!==filter)return false;return true;});},get:function(id){for(var i=0;i<this.jobs.length;i++)if(String(this.jobs[i].id)===String(id))return this.jobs[i];return null;}};
+var uiState={page:'dashboard',containerFilter:'all',jobFilter:'all',jobAutoScroll:true,openGroups:{},settingsTab:'target'};
+var PAGE_META={dashboard:['Übersicht','Status, Statistiken und letzte Aktivitäten auf einen Blick'],containers:['Container','Alle Docker-Container mit ihrem Backup-Status'],backups:['Backups','Verfügbare Backups im Speicher-Ziel \u2013 sichern, wiederherstellen oder löschen'],settings:['Einstellungen','Speicher-Ziel, Zeitplan und Verhalten konfigurieren'],jobs:['Aufgaben','Live-Log aller laufenden und vergangenen Jobs']};
+function cronFieldOk(v,min,max){if(v==='*')return true;var m=/^\*\/([0-9]+)$/.exec(v);if(m){var s=+m[1];return s>=1&&s<=(max+1);}var parts=v.split(',');if(!parts.length)return false;for(var i=0;i<parts.length;i++){var p=parts[i];var r=/^([0-9]+)-([0-9]+)(\/([0-9]+))?$/.exec(p);if(r){var a=+r[1],b=+r[2];var st=r[4]?+r[4]:1;if(a<min||b>max||a>b||st<1)return false;continue;}if(!/^[0-9]+$/.test(p))return false;var n=+p;if(n<min||n>max)return false;}return true;}
+function validateCron(expr){expr=String(expr==null?'':expr).trim();if(!expr)return {ok:false,msg:'Bitte einen Cron-Ausdruck eingeben (z. B. 0 3 * * *).'};var parts=expr.split(/\s+/);if(parts.length!==5)return {ok:false,msg:'Cron braucht genau 5 Felder: Min Stunde Tag Monat Wochentag (z. B. 0 3 * * *).'};var spec=[[0,59,'Minute (0-59)'],[0,23,'Stunde (0-23)'],[1,31,'Tag (1-31)'],[1,12,'Monat (1-12)'],[0,7,'Wochentag (0-7, 7 = Sonntag)']];for(var i=0;i<5;i++){if(!cronFieldOk(parts[i],spec[i][0],spec[i][1]))return {ok:false,msg:'Ungültiges Feld '+(i+1)+' ('+spec[i][2]+'): '+parts[i]};}return {ok:true,msg:'Gültig \u2013 nächster Lauf wird serverseitig (UTC) berechnet.'};}
+function describeCron(expr){var p=String(expr||'').trim().split(/\s+/);if(p.length!==5)return '';if(p[0]==='0'&&/^[0-9]+$/.test(p[1])&&p[2]==='*'&&p[3]==='*'&&p[4]==='*')return 'täglich um '+p[1]+':00 UTC';return '';}
+var Ticker={inflight:{},lastPoll:{status:0,containers:0,backups:0,jobs:0},running:false,started:false,jobsFastUntil:0,
+isHidden:function(){try{return document.hidden;}catch(e){return false;}},need:function(key,minMs){var n=Date.now();return (n-(this.lastPoll[key]||0))>=(minMs||0);},
+mark:function(key){this.lastPoll[key]=Date.now();},
+requestJobsSoon:function(){this.jobsFastUntil=Date.now()+30000;this.kickJobs();},
+kickJobs:function(){var self=this;if(this.isHidden())return;if(this.inflight.jobs)return;this.inflight.jobs=true;refreshJobs(true).catch(function(){}).finally(function(){self.inflight.jobs=false;});},
+start:function(){if(this.started)return;this.started=true;var self=this;
+function loop(){if(!self.isHidden()){var p=uiState.page;
+if(self.need('jobs',self.jobsFastActive()?3000:8000)){self.inflight.jobs=true;refreshJobs(false).catch(function(){}).finally(function(){self.inflight.jobs=false;});}
+if(self.need('status',30000)&&!self.inflight.status){self.inflight.status=true;refreshStatus(false).catch(function(){}).finally(function(){self.inflight.status=false;});}
+if(p==='containers'&&self.need('containers',30000)&&!self.inflight.containers){self.inflight.containers=true;refreshContainers(false).catch(function(){}).finally(function(){self.inflight.containers=false;});}
+if(p==='backups'&&self.need('backups',30000)&&!self.inflight.backups){self.inflight.backups=true;refreshBackups(false).catch(function(){}).finally(function(){self.inflight.backups=false;});}
+if(self.need('render',30000)){self.mark('render');if(p==='containers')renderContainers();else if(p==='backups')renderBackups();else if(p==='dashboard')renderDashboard();}
+}setTimeout(loop,1000);}loop();
+document.addEventListener('visibilitychange',function(){if(!document.hidden){self.mark('render');self.lastPoll.jobs=0;self.kickJobs();}});},
+jobsFastActive:function(){return Date.now()<this.jobsFastUntil;}};
+function emptyState(ico,title,text){return '<div class="empty-state">'+icon(ico)+'<b>'+esc(title)+'</b>'+(text?'<p>'+esc(text)+'</p>':'')+'</div>';}
+function skeletonBlock(label){return '<div class="stat-card" style="grid-column:1/-1"><div class="stat-label">'+esc(label||'Lade ...')+'</div><div class="stat-val skeleton">Laden</div><div class="stat-sub">Bitte warten ...</div></div>';}
+function renderSidebar(){var s=dataStore.status;var dot=qs('#footStorageDot'),txt=qs('#footStorageText');if(!s){if(dot)dot.className='dot warn';if(txt)txt.textContent='Status unbekannt';}else{if(dot)dot.className='dot '+((s.storage_ok)?'run':'err');if(txt)txt.textContent=((s.storage_type||'?').toUpperCase())+' '+((s.storage_ok)?'erreichbar':'nicht erreichbar');var fv=qs('#footVersion');if(fv)fv.textContent='v'+(s.version||'?');}var cs=dataStore.containers;var nb=qs('#navContainersBadge');if(nb){if(cs&&cs.length){nb.textContent=String(cs.length);nb.classList.remove('hidden');}else{nb.textContent='';nb.classList.add('hidden');}}var total=0;if(Array.isArray(dataStore.backups)){for(var i=0;i<dataStore.backups.length;i++)total+=((dataStore.backups[i].backups||[]).length);}var ab=qs('#navBackupsBadge');if(ab){if(total){ab.textContent=String(total);ab.classList.remove('hidden');}else{ab.textContent='';ab.classList.add('hidden');}}var running=0;for(var j=0;j<jobStore.jobs.length;j++)if(jobStore.jobs[j].status==='running')running++;var jb=qs('#navJobsBadge');if(jb){if(running){jb.textContent=running+' läuft';jb.className='badge blue';}else{jb.textContent='';jb.className='badge gray hidden';}}try{document.title=running?('('+running+') DockGuard \u2013 Unraid Container Backup'):'DockGuard \u2013 Unraid Container Backup';}catch(e){}}
+function go(page){if(!PAGE_META[page])page='dashboard';uiState.page=page;qsa('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.page===page);});qsa('.page').forEach(function(s){s.classList.toggle('hidden',s.id!=='page-'+page);});var t=qs('#pageTitle'),su=qs('#pageSub');if(t)t.textContent=PAGE_META[page][0];if(su)su.textContent=PAGE_META[page][1];if(page==='containers')renderContainers();if(page==='backups')renderBackups();if(page==='jobs')renderJobs();if(page==='settings'&&!settingsStore.loaded)loadSettings();if(page==='dashboard')renderDashboard();try{if(window.location.hash!=='#'+page)history.replaceState(null,'','#'+page);}catch(e){}}
+function refreshStatus(force){if(!force&&!Ticker.need('status',25000))return Promise.resolve(dataStore.status);if(Ticker.inflight.status&&!force)return Promise.resolve(dataStore.status);Ticker.inflight.status=true;if(force)Ticker.mark('status');return api('/api/status').then(function(s){dataStore.status=s;dataStore.lastError.status=null;Ticker.mark('status');renderSidebar();if(uiState.page==='dashboard')renderDashboard();return s;}).catch(function(e){dataStore.lastError.status=e;if(uiState.page==='dashboard'){var g=qs('#dashStats');if(g)g.innerHTML=emptyState('alert','API nicht erreichbar',e.message);}renderSidebar();return dataStore.status;}).finally(function(){Ticker.inflight.status=false;});}
+function refreshContainers(force){if(!force&&!Ticker.need('containers',12000))return Promise.resolve(dataStore.containers);if(Ticker.inflight.containers&&!force)return Promise.resolve(dataStore.containers);Ticker.inflight.containers=true;if(force)Ticker.mark('containers');return api('/api/containers').then(function(c){dataStore.containers=c;dataStore.lastError.containers=null;Ticker.mark('containers');renderSidebar();if(uiState.page==='containers')renderContainers();return c;}).catch(function(e){dataStore.lastError.containers=e;dataStore.containers=null;if(uiState.page==='containers'){var g=qs('#containerGrid');if(g)g.innerHTML=emptyState('alert','Docker nicht erreichbar',e.message);}renderSidebar();return null;}).finally(function(){Ticker.inflight.containers=false;});}
+function refreshBackups(force){if(!force&&!Ticker.need('backups',25000))return Promise.resolve(dataStore.backups);if(Ticker.inflight.backups&&!force)return Promise.resolve(dataStore.backups);Ticker.inflight.backups=true;if(force)Ticker.mark('backups');return api('/api/backups').then(function(b){dataStore.backups=Array.isArray(b)?b:[];dataStore.lastError.backups=null;Ticker.mark('backups');renderSidebar();if(uiState.page==='backups')renderBackups();return dataStore.backups;}).catch(function(e){dataStore.lastError.backups=e;dataStore.backups=[];if(uiState.page==='backups'){var g=qs('#backupGroups');if(g)g.innerHTML=emptyState('alert','Backups konnten nicht geladen werden',e.message);}renderSidebar();return [];}).finally(function(){Ticker.inflight.backups=false;});}
+function refreshJobs(force){if(!force&&!Ticker.need('jobs',2500))return Promise.resolve(jobStore.jobs);if(Ticker.inflight.jobs&&!force)return Promise.resolve(jobStore.jobs);if(!force)Ticker.inflight.jobs=true;if(force)Ticker.mark('jobs');return api('/api/jobs').then(function(j){jobStore.set(j);jobStore.loaded=true;dataStore.lastError.jobs=null;Ticker.mark('jobs');renderSidebar();if(uiState.page==='jobs')renderJobs();if(uiState.page==='dashboard')renderDashboard();return jobStore.jobs;}).catch(function(e){dataStore.lastError.jobs=e;return jobStore.jobs;}).finally(function(){Ticker.inflight.jobs=false;});}
+function refreshAll(force){refreshStatus(force);refreshContainers(force);refreshBackups(force);refreshJobs(force);}
+function renderDashboard(){var s=dataStore.status;var grid=qs('#dashStats');if(!s){if(grid)grid.innerHTML=skeletonBlock('Status wird geladen')+skeletonBlock('Statistiken')+skeletonBlock('Speicher-Ziel');var dj0=qs('#dashJobs');if(dj0)dj0.innerHTML=skeletonBlock('Aufgaben werden geladen');var ds0=qs('#dashSetup');if(ds0)ds0.innerHTML='';return;}var st=s.stats||{};var runningCount=(dataStore.containers)?dataStore.containers.filter(function(c){return c.running;}).length:null;var nextRun=null;try{nextRun=s.next_run?new Date(s.next_run):null;if(nextRun&&isNaN(nextRun.getTime()))nextRun=null;}catch(e){nextRun=null;}var lastTs=null;try{if(st.last_backup_ts){var d=new Date(st.last_backup_ts);if(!isNaN(d.getTime()))lastTs=d.getTime();}}catch(e){lastTs=null;}var setupEl=qs('#dashSetup');if(setupEl){var showSetup=(!s.storage_ok&&!(st.backups>0));setupEl.innerHTML=showSetup?('<div class="setup-banner">'+icon('settings')+'<div><b>Noch kein Speicher-Ziel konfiguriert</b><p>Richte in den Einstellungen dein Backup-Ziel ein (SMB-Share oder S3). DockGuard verbindet sich direkt aus dem Container \u2013 ohne Mounts oder Einrichtung auf dem Unraid-Host.</p></div><button class="btn primary" data-go-settings type="button">Jetzt einrichten</button></div>'):'';var gb=setupEl.querySelector('[data-go-settings]');if(gb)gb.addEventListener('click',function(){go('settings');});}var cards=[{ico:'box',label:'Container gesichert',val:String(st.containers!=null?st.containers:'\u2013'),sub:(runningCount==null?'Docker: n/a':runningCount+' laufen gerade')},{ico:'archive',label:'Backups',val:String(st.backups!=null?st.backups:'\u2013'),sub:fmtSize(st.total_bytes)+' belegt'},{ico:'clock',label:'Nächster Lauf',val:(nextRun?nextRun.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'\u2013'),sub:(nextRun?nextRun.toLocaleDateString('de-DE')+' (UTC)':'Cron: '+(s.schedule||'\u2013'))},{ico:'shield',label:'Letztes Backup',val:(lastTs?fmtAge(lastTs):'noch keins'),sub:(st.last_backup_container?st.last_backup_container:'keine Daten')},{ico:'database',label:'Speicher-Ziel',val:String(s.storage_type||'?').toUpperCase(),sub:(s.storage_ok?'erreichbar':'nicht erreichbar'),bad:!s.storage_ok?1:0},{ico:'layers',label:'Upload-Verifizierung',val:(s.verify_uploads?'aktiv':'aus'),sub:'atomarer Upload (.part)'}];if(grid)grid.innerHTML=cards.map(function(c){return '<div class="stat-card"><div class="stat-icon" aria-hidden="true">'+icon(c.ico)+'</div><div class="stat-label">'+esc(c.label)+'</div><div class="stat-val">'+esc(c.val)+'</div><div class="stat-sub">'+(c.bad?'<span class="dot err" style="vertical-align:1px;margin-right:5px;"></span>':'')+esc(c.sub)+'</div></div>';}).join('');var jobsEl=qs('#dashJobs');if(jobsEl){var recent=jobStore.jobs.slice(0,6);if(!recent.length){jobsEl.innerHTML=emptyState('list','Noch keine Aufgaben','Starte ein Backup oder warte auf den geplanten Lauf \u2013 hier erscheint das Live-Log.');}else{jobsEl.innerHTML=recent.map(function(j){return '<div class="job-card '+esc(j.status)+'" style="margin-bottom:10px;"><div class="job-head" style="cursor:default;"><div class="job-icon '+esc(j.kind||'job')+'">'+icon(j.kind==='restore'?'download':j.kind==='scheduled'?'clock':'zap')+'</div><div class="job-main"><b>'+esc(j.title)+'</b><div class="job-sub">'+esc(fmtTime(j.started))+' \u00b7 '+esc(j.duration!=null?(j.duration+' s'):'läuft \u2026')+'</div></div><span class="badge '+(j.status==='running'?'yellow':j.status==='done'?'green':'red')+'">'+esc(j.status==='running'?'läuft':j.status==='done'?'fertig':'Fehler')+'</span><button class="btn secondary sm" data-job-goto="'+esc(j.id)+'" type="button">Ansehen</button></div>'+(j.error?'<div class="job-error" role="alert">'+esc(j.error)+'</div>':'')+'</div>';}).join('');qsa('[data-job-goto]',jobsEl).forEach(function(b){b.addEventListener('click',function(){go('jobs');});});}}}
+function setContainerFilter(f){uiState.containerFilter=f;qsa('#containerChips .chip').forEach(function(c){c.classList.toggle('active',c.dataset.filter===f);});renderContainers();}
+function renderContainers(){var grid=qs('#containerGrid');if(!grid)return;var list=dataStore.containers;if(list===null){grid.innerHTML='<div class="c-grid">'+skeletonBlock('Container werden geladen')+skeletonBlock('Docker-Abfrage')+'</div>';return;}if(!list.length){grid.innerHTML=emptyState('box','Keine Container gefunden','Der Docker-Socket ist verbunden, aber es wurden keine Container gemeldet.');return;}var qEl=qs('#containerSearch');var q=qEl?qEl.value.trim().toLowerCase():'';var filtered=list.filter(function(c){var okF=(uiState.containerFilter==='all')||(uiState.containerFilter==='running'&&c.running)||(uiState.containerFilter==='stopped'&&!c.running);var okQ=(!q)||((c.name||'').toLowerCase().indexOf(q)>-1)||((c.image||'').toLowerCase().indexOf(q)>-1);return okF&&okQ;});var a=qs('#chipAll'),r=qs('#chipRun'),sp=qs('#chipStop');if(a)a.textContent=String(list.length);if(r)r.textContent=String(list.filter(function(c){return c.running;}).length);if(sp)sp.textContent=String(list.filter(function(c){return !c.running;}).length);if(!filtered.length){grid.innerHTML=emptyState('search','Keine Treffer','Kein Container passt zu Filter oder Suchbegriff.');return;}grid.innerHTML='<div class="c-grid">'+filtered.map(function(c){var lastTs=c.last_backup?backupTs(c.last_backup):null;var dot=c.running?'run':(c.state==='exited'||c.state==='dead'?'stop':'warn');var badge=c.running?'green':(c.state==='exited'||c.state==='dead'?'gray':'yellow');var lbl=c.running?'läuft':(c.state||'unbekannt');return '<div class="c-card"><div class="c-head"><span class="dot '+dot+'" aria-hidden="true"></span><div class="c-title"><b>'+esc(c.name)+'</b><span class="c-image">'+esc(c.image||'?')+'</span></div><span class="badge '+badge+'">'+esc(lbl)+'</span></div><div class="c-meta"><div class="c-meta-item">'+icon('layers')+' <b>'+esc(c.backup_count||0)+'</b>&nbsp;Backups</div><div class="c-meta-item">'+icon('clock')+' '+(c.last_backup?esc(fmtAge(lastTs)):'kein Backup')+'</div><div class="c-meta-item">'+icon('hard-drive')+' '+(c.last_backup_size?esc(fmtSize(c.last_backup_size)):'\u2013')+'</div></div><div class="c-actions"><button class="btn sm primary" data-backup-one="'+esc(c.name)+'" type="button">'+icon('zap')+' Sichern</button><button class="btn sm secondary" data-restore-for="'+esc(c.name)+'" type="button" '+((c.backup_count)?'':'disabled title="Noch keine Backups vorhanden"')+'>'+icon('download')+' Wiederherstellen</button></div></div>';}).join('')+'</div>';qsa('[data-backup-one]',grid).forEach(function(b){b.addEventListener('click',function(){startBackupOne(b.getAttribute('data-backup-one'));});});qsa('[data-restore-for]',grid).forEach(function(b){b.addEventListener('click',function(){openRestoreFor(b.getAttribute('data-restore-for'));});});}
+function startBackupOne(name){return api('/api/backup',{method:'POST',body:JSON.stringify({containers:[name]})}).then(function(){toast("Backup von '"+name+"' gestartet",'ok');go('jobs');Ticker.requestJobsSoon();}).catch(function(e){toast(e.message,'err');});}
+function startBackupAll(){var btn=qs('#btnBackupAllTop');if(btn)btn.disabled=true;return api('/api/backup',{method:'POST',body:JSON.stringify({all:true})}).then(function(){toast('Backup aller Container gestartet','ok');go('jobs');Ticker.requestJobsSoon();}).catch(function(e){toast(e.message,'err');}).finally(function(){if(btn)btn.disabled=false;});}
+function expandAll(open){var groups=dataStore.backups.map(function(g){return g.container;}).filter(function(c){return !!c;});groups.forEach(function(c){if(open)uiState.openGroups[c]=1;else delete uiState.openGroups[c];});var e=qs('#btnExpandAll'),cc=qs('#btnCollapseAll');if(e)e.classList.toggle('hidden',!!open);if(cc)cc.classList.toggle('hidden',!open);renderBackups();}
+function toggleGroup(name){if(uiState.openGroups[name])delete uiState.openGroups[name];else uiState.openGroups[name]=1;renderBackups();}
+function renderBackups(){var root=qs('#backupGroups');if(!root)return;if(!Array.isArray(dataStore.backups)||!dataStore.backups.length){root.innerHTML=emptyState('archive','Noch keine Backups vorhanden','Backups erscheinen hier, sobald mindestens ein Container gesichert wurde \u2013 entweder über die Schaltflächen oben oder automatisch durch den Zeitplan.');return;}var qEl=qs('#backupSearch');var q=qEl?qEl.value.trim().toLowerCase():'';var groups=dataStore.backups.map(function(g){return {container:g.container,backups:(g.backups||[]).filter(function(b){return (!q)||((g.container||'').toLowerCase().indexOf(q)>-1)||((b.id||'').toLowerCase().indexOf(q)>-1);})};}).filter(function(g){return g.backups.length;}).sort(function(a,b){var at=a.backups.reduce(function(m,x){return Math.max(m,backupEpochMs(x));},0);var bt=b.backups.reduce(function(m,x){return Math.max(m,backupEpochMs(x));},0);return bt-at;});if(!groups.length){root.innerHTML=emptyState('search','Keine Treffer','Kein Backup passt zur Suche oder es sind keine Backups vorhanden.');return;}root.innerHTML=groups.map(function(g){var open=!!uiState.openGroups[g.container];var rows=g.backups.slice().reverse().map(function(b){var ts=backupEpochMs(b);return '<tr><td><span class="bk-id" title="'+esc(b.id)+'">'+esc(b.id)+'</span></td><td>'+esc(fmtSize(b.size))+'</td><td>'+esc(fmtAge(ts))+'</td><td><div class="row-actions"><button class="icon-btn" data-restore-sel="'+esc(g.container)+'|'+esc(b.id)+'" type="button" title="Wiederherstellen">'+icon('download')+' Restore</button><button class="icon-btn danger" data-delete-sel="'+esc(g.container)+'|'+esc(b.id)+'" type="button" title="Löschen">'+icon('trash')+' Löschen</button></div></td></tr>';}).join('');return '<div class="b-group '+(open?'open':'')+'"><button class="b-group-head" data-group="'+esc(g.container)+'" type="button" aria-expanded="'+(open?'true':'false')+'"><span class="dot '+(open?'run':'')+'" aria-hidden="true"></span><b>'+esc(g.container)+'</b><span class="g-count">'+g.backups.length+' '+(g.backups.length===1?'Backup':'Backups')+'</span>'+icon('chev','chev')+'</button><div class="b-group-body"><table class="data"><thead><tr><th>Backup</th><th>Größe</th><th>Alter</th><th style="text-align:right;">Aktionen</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';}).join('');qsa('[data-group]',root).forEach(function(b){b.addEventListener('click',function(){toggleGroup(b.getAttribute('data-group'));});});qsa('[data-restore-sel]',root).forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var v=b.getAttribute('data-restore-sel').split('|');openRestoreFor(v[0],v.slice(1).join('|'));});});qsa('[data-delete-sel]',root).forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var v=b.getAttribute('data-delete-sel').split('|');deleteBackup(v[0],v.slice(1).join('|'));});});}
+function deleteBackup(container,backupId){return confirmDialog({title:'Backup löschen',icon:'trash',danger:true,confirmLabel:'Endgültig löschen',body:'<p>Soll <b class="mono">'+esc(backupId)+'</b> von <b>'+esc(container)+'</b> wirklich gelöscht werden?</p><div class="danger-box">'+icon('alert')+'<span>Das Backup wird <b>unwiderruflich</b> vom Speicher-Ziel gelöscht. Ein Wiederherstellen ist danach nicht mehr möglich.</span></div>'}).then(function(ok){if(!ok)return false;return api('/api/backups/'+encodeURIComponent(container)+'/'+encodeURIComponent(backupId),{method:'DELETE'}).then(function(r){toast("Backup '"+backupId+"' gelöscht",'ok');return refreshBackups(true).then(function(){return refreshStatus(true);}).then(function(){return true;});}).catch(function(e){toast('Löschen fehlgeschlagen: '+e.message,'err');return refreshBackups(true).then(function(){return false;});});});}
+function jobElapsed(j){try{var s=j.started?new Date(j.started).getTime():null;if(s==null||isNaN(s))return null;var e=j.finished?new Date(j.finished).getTime():Date.now();if(isNaN(e))e=Date.now();return Math.max(0,Math.round((e-s)/1000));}catch(e){return null;}}
+function jobProgress(j){try{if(j.result&&typeof j.result==='object'&&typeof j.result.progress==='number'){var p=Math.round(j.result.progress);return Math.max(0,Math.min(100,p));}if(j.status==='done')return 100;if(j.status==='error')return 100;var n=(j.log&&j.log.length)||0;var pct=8+n*4;var txt=(j.log||[]).join('\n').toLowerCase();var stages=['lade','sichere','uploade','template','image','container','mount'];var hits=0;for(var i=0;i<stages.length;i++)if(txt.indexOf(stages[i])>-1)hits++;pct+=hits*6;if(pct>92)pct=92;return Math.max(6,Math.min(92,Math.round(pct)));}catch(e){return j.status==='running'?15:100;}}
+function summarizeResult(r){if(r==null)return '';if(Array.isArray(r)){var ok=0,fail=0;for(var i=0;i<r.length;i++){if(r[i]&&r[i].error)fail++;else ok++;}return ok+' erfolgreich'+(fail?(', '+fail+' mit Fehler'):'')+' ('+r.length+' Container)';}if(typeof r==='object'){if(r.archive||r.container){var parts=[];if(r.container)parts.push('Container: '+r.container);if(r.archive)parts.push('Archiv: '+r.archive);if(r.size_bytes!=null)parts.push('Größe: '+fmtSize(r.size_bytes));if(r.elapsed_seconds!=null)parts.push('Dauer: '+r.elapsed_seconds+' s');if(r.mounts_restored!=null)parts.push(r.mounts_restored+' Mount(s)');if(r.template_restored)parts.push('Template: ja');return parts.join(' \u00b7 ');}if(r.backup) return 'Backup: '+r.backup+(r.elapsed_seconds!=null?(' \u00b7 '+r.elapsed_seconds+' s'):'');try{var s=JSON.stringify(r);return s.length>220?s.slice(0,220)+'\u2026':s;}catch(e){return '';}}return String(r);}
+function setJobFilter(f){uiState.jobFilter=f;qsa('#jobChips .chip').forEach(function(c){c.classList.toggle('active',c.dataset.filter===f);});renderJobs();}
+function toggleJob(id){if(jobStore.expanded[id])delete jobStore.expanded[id];else jobStore.expanded[id]=1;renderJobs();}
+function hideFinishedJobs(){jobStore.hiddenFinished=true;renderJobs();toast('Erledigte Aufgaben in dieser Ansicht ausgeblendet (serverseitig bleiben sie erhalten).','ok');announce('Erledigte Aufgaben ausgeblendet, nur Ansicht.');}
+function copyText(t,okMsg){function done(){toast(okMsg||'In Zwischenablage kopiert','ok');}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fallback();});}else fallback();function fallback(){try{var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();}catch(e){toast('Kopieren nicht möglich','err');}}}
+function retryJob(j){if(!j)return;if(j.kind==='restore'){openRestoreFor(jobContainerOf(j),null);}else if(j.title&&j.title.indexOf('alle Container')>-1){startBackupAll();}else{var c=jobContainerOf(j);if(c)startBackupOne(c);else startBackupAll();}}
+function jobContainerOf(j){try{if(j.result&&j.result.container)return j.result.container;var m=/Backup:\s*([^,]+)/.exec(j.title||'');if(m)return m[1].trim();var m2=/Wiederherstellung:\s*(.+)/.exec(j.title||'');if(m2)return m2[1].trim();}catch(e){}return null;}
+function renderJobs(){var list=qs('#jobsList');if(!list)return;if(!jobStore.loaded){list.innerHTML=skeletonBlock('Aufgaben werden geladen');return;}var jobs=jobStore.visible(uiState.jobFilter).slice().sort(function(a,b){var ar=a.status==='running'?0:1,br=b.status==='running'?0:1;if(ar!==br)return ar-br;return String(b.started||'').localeCompare(String(a.started||''));});if(!jobs.length){list.innerHTML=emptyState(uiState.jobFilter==='all'?'terminal':'search',uiState.jobFilter==='all'?'Keine Aufgaben':'Keine passenden Aufgaben',uiState.jobFilter==='all'?'Gestartete Backups und Wiederherstellungen erscheinen hier mit Live-Log.':'Für diesen Filter gibt es gerade nichts.'+(jobStore.hiddenFinished?' Hinweis: Erledigte sind in dieser Ansicht ausgeblendet.':''));return;}list.innerHTML=jobs.map(function(j){var open=(j.status!=='done'&&j.status!=='error')||!!jobStore.expanded[j.id];var pct=jobProgress(j);var elapsed=jobElapsed(j);var logHtml=(j.log&&j.log.length)?'<pre class="job-log" tabindex="0" aria-label="Job-Log">'+esc(j.log.slice(-200).join('\n'))+'</pre>':'';var errHtml=j.error?'<div class="job-error" role="alert">'+esc(j.error)+'</div>':'';var resHtml='';try{if(j.result!=null&&(j.status==='done'||j.status==='error')){var s=summarizeResult(j.result);if(s)resHtml='<div class="job-result"><b>Ergebnis:</b> '+esc(s)+'</div>';}}catch(e){}var barCls=j.status==='done'?'done':(j.status==='error'?'failed':'');return '<div class="job-card '+esc(j.status)+' '+(open?'open':'')+'" id="job-'+esc(j.id)+'"><button class="job-head" data-job-toggle="'+esc(j.id)+'" aria-expanded="'+(open?'true':'false')+'" type="button"><div class="job-icon '+esc(j.kind||'job')+'">'+icon(j.kind==='restore'?'download':j.kind==='scheduled'?'clock':'zap')+'</div><div class="job-main"><b>'+esc(j.title)+'</b><div class="job-sub">gestartet '+esc(fmtTime(j.started))+(j.finished?(' \u00b7 beendet '+esc(fmtTime(j.finished))):'')+((j.duration!=null)?(' \u00b7 Dauer '+esc(j.duration)+' s'):((elapsed!=null&&j.status==='running')?(' \u00b7 '+elapsed+' s vergangen'):''))+'</div></div><span class="badge '+(j.status==='running'?'yellow':j.status==='done'?'green':'red')+'">'+esc(j.status==='running'?'läuft \u2026':j.status==='done'?'fertig':'Fehler')+'</span>'+icon('chev','job-chev')+'</button><div class="job-progress '+barCls+'" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100" aria-label="Fortschritt '+esc(j.title)+'"><i style="width:'+pct+'%"></i></div>'+errHtml+resHtml+logHtml+'<div class="jobs-foot">'+'<button class="btn secondary sm" data-copy-log="'+esc(j.id)+'" type="button">'+icon('copy')+' Log kopieren</button>'+(j.status!=='running'?'<button class="btn secondary sm" data-retry-job="'+esc(j.id)+'" type="button">'+icon('refresh')+' Erneut starten</button>':'')+'<span class="spacer"></span><span>'+esc((j.log||[]).length)+' Logzeilen'+(j.duration!=null?(' \u00b7 '+esc(j.duration)+' s'):'')+'</span></div></div>';}).join('');qsa('[data-job-toggle]',list).forEach(function(b){b.addEventListener('click',function(){toggleJob(b.getAttribute('data-job-toggle'));});});qsa('[data-copy-log]',list).forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var j=jobStore.get(b.getAttribute('data-copy-log'));if(j)copyText((j.log||[]).join('\n')||('Titel: '+(j.title||'')), 'Log kopiert');});});qsa('[data-retry-job]',list).forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();var j=jobStore.get(b.getAttribute('data-retry-job'));retryJob(j);});});}
+var RestoreWizard={state:null,open:function(container,presetBackupId){var group=null;for(var i=0;i<dataStore.backups.length;i++)if(dataStore.backups[i].container===container)group=dataStore.backups[i];if(!group||!(group.backups||[]).length){toast("Für '"+container+"' gibt es keine Backups",'warn');return;}var list=group.backups.slice();var ids={};for(var k=0;k<list.length;k++)ids[list[k].id]=1;var sel=presetBackupId||null;if(sel&&!ids[sel])sel=list[list.length-1].id;if(!sel)sel=list[list.length-1].id;var info=null;if(dataStore.containers)for(var c=0;c<dataStore.containers.length;c++)if(dataStore.containers[c].name===container)info=dataStore.containers[c];this.state={step:1,container:container,backupId:sel,overwrite:!!(info&&info.running),jobId:null,pollTimer:null,backups:list,running:!!(info&&info.running)};this.render();},render:function(){var st=this.state;if(!st)return;var self=this;var steps=['Auswahl','Warnung','Start','Ergebnis'];var head='<div class="wizard-steps">'+steps.map(function(n,i){var nr=i+1;return '<div class="step '+((nr===st.step)?'active':(nr<st.step?'done':''))+'">'+nr+'. '+n+'</div>';}).join('')+'</div>';var body='';if(st.step===1){var opts=st.backups.slice().reverse().map(function(b){var ts=backupEpochMs(b);return '<option value="'+esc(b.id)+'">'+esc(b.id)+' ('+esc(fmtSize(b.size))+', '+esc(fmtAge(ts))+')</option>';}).join('');body=head+'<div class="kv"><dt>Container</dt><dd>'+esc(st.container)+'</dd><dt>Backup</dt><dd><label class="sr-only" for="wizBackupSel">Backup auswählen</label><select id="wizBackupSel" style="width:100%;">'+opts+'</select></dd></div>'+(st.running?'<div class="warn-box">'+icon('alert')+'<span>Der Container läuft aktuell und wird im nächsten Schritt ersetzt.</span></div>':'');}else if(st.step===2){body=head+'<div class="kv"><dt>Container</dt><dd>'+esc(st.container)+'</dd><dt>Backup</dt><dd>'+esc(st.backupId)+'</dd></div><div class="warn-box">'+icon('alert')+'<span>Vorhandene Daten an den Originalpfaden werden überschrieben'+(st.running?' \u2013 der Container läuft aktuell und wird ersetzt':'')+'.</span></div><label class="checkbox"><input type="checkbox" id="wizOverwrite"'+(st.overwrite?' checked':'')+'><span><b>Bestehenden Container ersetzen</b><br>Überschreibt Daten und legt den Container neu an (inkl. Image, Ports, Env, Netzwerk, Template).</span></label>';}else if(st.step===3){body=head+'<p>Restore läuft ... Fortschritt und Log findest du auch unter Aufgaben.</p><div class="job-progress" role="progressbar" aria-valuenow="15" aria-valuemin="0" aria-valuemax="100" aria-label="Restore-Fortschritt"><i style="width:15%"></i></div><pre class="job-log" id="wizLog">Starte Wiederherstellung ...</pre>';}else{body=head+'<div id="wizResult"><p>Ergebnis wird geladen ...</p><div class="job-progress" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" aria-label="Restore-Ergebnis"><i style="width:50%"></i></div></div>';}
+var foot='';if(st.step===1)foot='<button class="btn secondary" data-wiz-cancel type="button">Abbrechen</button><button class="btn primary" data-wiz-next type="button">Weiter</button>';else if(st.step===2)foot='<button class="btn secondary" data-wiz-back type="button">Zurück</button><button class="btn primary" data-wiz-start type="button">'+icon('download')+' Wiederherstellen</button>';else if(st.step===3)foot='<button class="btn secondary" data-wiz-jobs type="button">Zu Aufgaben</button>';else foot='<button class="btn secondary" data-wiz-close type="button">Schließen</button><button class="btn secondary" data-wiz-jobs type="button">Zu Aufgaben</button>';
+ModalManager.closeAll();ModalManager.open({label:'Container wiederherstellen \u2013 Schritt '+st.step+' von 4',html:'<div class="modal-head"><div class="modal-icon warn">'+icon('download')+'</div><h3>Container wiederherstellen</h3><button class="modal-close" data-close type="button" aria-label="Schließen">'+icon('x')+'</button></div><div class="modal-body" data-wiz-body>'+body+'</div><div class="modal-foot">'+foot+'</div>',onMount:function(modal,entry){self.wire(modal,entry);}});},wire:function(modal,entry){var self=this;var st=this.state;if(!st)return;qsa('[data-wiz-cancel]',modal).forEach(function(b){b.addEventListener('click',function(){ModalManager.close(entry,false);});});qsa('[data-wiz-close]',modal).forEach(function(b){b.addEventListener('click',function(){ModalManager.close(entry,false);});});qsa('[data-wiz-back]',modal).forEach(function(b){b.addEventListener('click',function(){st.step=1;self.render();});});qsa('[data-wiz-jobs]',modal).forEach(function(b){b.addEventListener('click',function(){ModalManager.close(entry,false);go('jobs');});});var sel=modal.querySelector('#wizBackupSel');if(sel){sel.value=st.backupId;if(sel.value!==st.backupId&&sel.options.length)sel.selectedIndex=0;st.backupId=sel.value;qsa('#wizBackupSel option',modal);sel.addEventListener('change',function(){st.backupId=sel.value;});}var ow=modal.querySelector('#wizOverwrite');if(ow){ow.addEventListener('change',function(){st.overwrite=ow.checked;});}qsa('[data-wiz-next]',modal).forEach(function(b){b.addEventListener('click',function(){if(sel)st.backupId=sel.value;if(!st.backupId){toast('Bitte ein Backup auswählen','warn');return;}st.step=2;self.render();});});qsa('[data-wiz-start]',modal).forEach(function(b){b.addEventListener('click',function(){var box=modal.querySelector('#wizOverwrite');var useOverwrite=box?box.checked:st.overwrite;st.overwrite=!!useOverwrite;self.startRestore(entry);});});if(st.step===4)self.pollResult(modal);}};
+RestoreWizard.startRestore=function(entry){var st=this.state;if(!st)return;var self=this;st.step=3;this.render();var payload={container:st.container,backup_id:st.backupId,overwrite:!!st.overwrite};api('/api/restore',{method:'POST',body:JSON.stringify(payload)}).then(function(r){var id=(r&&r.job)||(r&&r.job_id)||null;if(typeof id==='object'&&id)id=id.id||id.job||null;if(typeof id!=='string'&&r&&r.id)id=r.id;st.jobId=(typeof id==='string')?id:null;toast("Wiederherstellung von '"+st.container+"' gestartet",'ok');Ticker.requestJobsSoon();st.step=4;if(ModalManager.stack.length===0||ModalManager.stack[ModalManager.stack.length-1]!==entry){self.render();}else{self.render();}self.pollForJob();}).catch(function(e){toast('Restore fehlgeschlagen: '+e.message,'err');st.step=2;self.render();});};
+RestoreWizard.pollForJob=function(){var self=this;var st=this.state;if(!st)return;var tries=0;var timer=setInterval(function(){tries++;refreshJobs(true).catch(function(){}).finally(function(){var cur=st.jobId?jobStore.get(st.jobId):jobStore.jobs[0];if(cur&&(cur.status==='done'||cur.status==='error')){clearInterval(timer);if(ModalManager.stack.length)self.renderResult();}else if(tries>40){clearInterval(timer);if(ModalManager.stack.length)self.renderResult();}});},2500);st.pollTimer=timer;};
+RestoreWizard.pollResult=function(modal){this.renderResult(modal);};
+RestoreWizard.renderResult=function(modal){var st=this.state;if(!st)return;var box=(modal&&modal.querySelector('#wizResult'))||document.querySelector('#wizResult');if(!box){this.render();return;}var j=st.jobId?jobStore.get(st.jobId):jobStore.jobs[0];if(!j){box.innerHTML='<p>Job wurde gestartet \u2013 Details unter Aufgaben.</p>';return;}var pct=jobProgress(j);var cls=j.status==='done'?'done':(j.status==='error'?'failed':'');var out='<div class="job-progress '+cls+'" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100" aria-label="Restore-Fortschritt"><i style="width:'+pct+'%"></i></div>';if(j.status==='running')out+='<p>Restore läuft: '+esc(j.title||st.container)+' \u2013 bitte warten. Das Modal kann geschlossen werden; der Job läuft weiter.</p>'+((j.log&&j.log.length)?'<pre class="job-log">'+esc(j.log.slice(-60).join('\n'))+'</pre>':'');else if(j.status==='done'){var s='';try{s=summarizeResult(j.result);}catch(e){}out+='<div class="job-result" role="status"><b>Wiederherstellung abgeschlossen:</b> '+esc(s||j.title||st.container)+'</div>'+((j.log&&j.log.length)?'<pre class="job-log">'+esc(j.log.slice(-60).join('\n'))+'</pre>':'');}else{out+='<div class="job-error" role="alert">'+esc(j.error||'Fehler bei der Wiederherstellung')+'</div>'+((j.log&&j.log.length)?'<pre class="job-log">'+esc(j.log.slice(-60).join('\n'))+'</pre>':'')+'<div style="margin-top:10px;display:flex;gap:8px;"><button class="btn secondary sm" data-wiz-retry type="button">Erneut versuchen</button></div>';}box.innerHTML=out;var rb=box.querySelector('[data-wiz-retry]');if(rb)rb.addEventListener('click',function(){st.step=2;RestoreWizard.render();});};
+function openRestoreFor(container,presetBackupId){RestoreWizard.open(container,presetBackupId);}
+function confirmRestoreModal(container,presetBackupId){var st=RestoreWizard.state;var ow=document.querySelector('#wizOverwrite');var sel=document.querySelector('#wizBackupSel');var backupId=(sel&&sel.value)||(st&&st.backupId)||presetBackupId||null;var overwrite=ow?ow.checked:!!(st&&st.overwrite);if(!backupId){toast('Bitte ein Backup auswählen','warn');return Promise.resolve(false);}if(st&&st.container===container){st.backupId=backupId;st.overwrite=!!overwrite;}else{RestoreWizard.state={step:2,container:container,backupId:backupId,overwrite:!!overwrite,jobId:null,pollTimer:null,backups:[],running:false};}return api('/api/restore',{method:'POST',body:JSON.stringify({container:container,backup_id:backupId,overwrite:!!overwrite})}).then(function(r){ModalManager.closeAll();toast("Wiederherstellung von '"+container+"' gestartet",'ok');go('jobs');Ticker.requestJobsSoon();return true;}).catch(function(e){toast(e.message,'err');return false;});}
+function syncTypeTiles(){var t=settingsStore.data.backup_type==='s3'?'s3':'smb';qsa('#typeTiles .tile').forEach(function(el){var on=el.dataset.type===t;el.classList.toggle('sel',on);el.setAttribute('aria-checked',on?'true':'false');});var smb=qs('#settings-smb'),s3=qs('#settings-s3');if(smb)smb.classList.toggle('hidden',t!=='smb');if(s3)s3.classList.toggle('hidden',t!=='s3');}
+function setBackupType(t){settingsStore.setType(t);var hint=qs('#cronHint');if(hint&&uiState.page==='settings')validateCronLive(false);}
+function updateRemotePreview(){try{var t=settingsStore.data.backup_type==='s3'?'s3':'smb';var shareEl=qs('#smb_share'),pathEl=qs('#smb_path'),bEl=qs('#s3_bucket'),spEl=qs('#s3_path');var g=(t==='smb')?('backup:'+((shareEl&&shareEl.value)||'\u2026')+'/'+((pathEl&&pathEl.value)||'')):('backup:'+((bEl&&bEl.value)||'\u2026')+'/'+((spEl&&spEl.value)||''));g=String(g).replace(/\/+$/,'');var pv=qs('#remotePreview');if(pv)pv.textContent=g||'\u2013';return g;}catch(e){return '';}}
+function validateCronLive(markField){var el=qs('#schedule');var hint=qs('#cronHint');if(!el)return {ok:false};var v=el.value;var r=validateCron(v);if(hint){var desc=r.ok?describeCron(v):'';hint.className='cron-hint '+(r.ok?'ok':'err');hint.innerHTML=esc(r.msg)+(desc?(' <span>('+esc(desc)+')</span>'):'')+' <span>Hinweis: Zeiten in UTC.</span>';}el.classList.toggle('invalid',!r.ok);var pres=qsa('#schedulePresets .cron-preset');pres.forEach(function(p){p.classList.toggle('active',p.dataset.cron===String(v).trim());});return r;}
+function syncPreset(){validateCronLive(false);}
+function setSchedule(cron){var el=qs('#schedule');if(el){el.value=cron;validateCronLive(false);}settingsStore.data.schedule=cron;settingsStore.dirty=true;updateRemotePreview();}
+function togglePw(id,btn){var inp=document.getElementById(id);if(!inp)return;var show=inp.type==='password';inp.type=show?'text':'password';var b=btn||document.querySelector('[data-pw="'+id+'"]');if(b){b.setAttribute('aria-pressed',show?'true':'false');b.setAttribute('aria-label',show?'Passwort verbergen':'Passwort anzeigen');}try{if(show)announce('Passwort sichtbar');else announce('Passwort verborgen');}catch(e){}}
+function settingsMsg(text,isErr){var el=qs('#settingsMsg');if(!el)return;if(!text||!String(text).trim()){el.innerHTML='';el.className='settings-msg';return;}el.textContent=String(text);el.className='settings-msg '+(isErr?'err':'ok');}
+function fillSettings(s){settingsStore.fromServer(s||{});var d=settingsStore.data;for(var i=0;i<ALL_FIELDS.length;i++){var f=ALL_FIELDS[i];if(f==='backup_type')continue;var el=document.getElementById(f);if(!el)continue;var v=d[f];if(f==='verify_upload'){el.checked=!!v;continue;}if(v===undefined||v===null)continue;try{el.value=String(v);}catch(e){}}var po=qs('#parallelOut');if(po)po.textContent=String(d.parallel);syncTypeTiles();updateRemotePreview();validateCronLive(false);settingsMsg('','');}
+function isSecretField(f){return f==='smb_pass'||f==='s3_secret_key';}
+function collectSettings(){var out={};out.backup_type=settingsStore.data.backup_type==='s3'?'s3':'smb';for(var i=0;i<ALL_FIELDS.length;i++){var f=ALL_FIELDS[i];if(f==='backup_type')continue;var el=document.getElementById(f);if(!el){out[f]=settingsStore.data[f];continue;}if(f==='verify_upload'){out[f]=!!el.checked;continue;}if(isSecretField(f)){var raw=el.value;if(raw===SECRET_MASK){out[f]=SECRET_MASK;continue;}if(!raw){var prev=settingsStore.data[f];out[f]=(prev===SECRET_MASK)?SECRET_MASK:'';continue;}out[f]=raw;continue;}var v=String(el.value==null?'':el.value);var trimmed=v.trim();if(NUMERIC_FIELDS.indexOf(f)>-1){if(trimmed===''){out[f]='';}else{var n=parseInt(trimmed,10);out[f]=isNaN(n)?trimmed:n;}continue;}out[f]=trimmed;}return out;}
+function loadSettings(){settingsMsg('Lade Einstellungen ...',false);return api('/api/settings').then(function(s){fillSettings(s);return s;}).catch(function(e){settingsMsg('Einstellungen konnten nicht geladen werden: '+e.message,true);throw e;});}
+function testConnection(){var btn=qs('#testBtn');settingsMsg('Teste Verbindung ...',false);if(btn){btn.classList.add('loading');btn.disabled=true;}var payload=collectSettings();return api('/api/settings/test',{method:'POST',body:JSON.stringify(payload)}).then(function(r){if(r&&r.ok){settingsMsg('Verbindung erfolgreich \u2013 Ziel erreichbar',false);toast('Verbindung zum Speicher-Ziel erfolgreich','ok');}else{settingsMsg('Ziel nicht erreichbar \u2013 Zugangsdaten und Netzwerk prüfen',true);toast('Ziel nicht erreichbar','warn');}return r;}).catch(function(e){settingsMsg(e.message,true);toast(e.message,'err');throw e;}).finally(function(){if(btn){btn.classList.remove('loading');btn.disabled=false;}});}
+function saveSettings(){var cron=validateCronLive(true);if(!cron.ok){settingsMsg(cron.msg,true);toast('Zeitplan ungültig: '+cron.msg,'err');var se=qs('#schedule');if(se)try{se.focus();}catch(e){}return Promise.resolve(false);}var btn=qs('#saveBtn');settingsMsg('Speichere ...',false);if(btn){btn.classList.add('loading');btn.disabled=true;}var payload=collectSettings();return api('/api/settings',{method:'POST',body:JSON.stringify(payload)}).then(function(r){fillSettings((r&&r.settings)||payload);var ok=!(r&&('storage_ok' in r))||!!r.storage_ok;settingsMsg(ok?'Gespeichert \u2013 Speicher-Ziel erreichbar':'Gespeichert \u2013 Speicher-Ziel aktuell nicht erreichbar',!ok);toast('Einstellungen gespeichert',ok?'ok':'warn');refreshStatus(true);refreshBackups(true);return true;}).catch(function(e){settingsMsg(e.message,true);toast('Speichern fehlgeschlagen: '+e.message,'err');return false;}).finally(function(){if(btn){btn.classList.remove('loading');btn.disabled=false;}});}
+function setSettingsTab(tab){uiState.settingsTab=tab;qsa('#settingsNav button').forEach(function(b){var on=b.dataset.tab===tab;b.classList.toggle('active',on);b.setAttribute('aria-selected',on?'true':'false');});['target','plan','filters','advanced'].forEach(function(t){var el=qs('#tab-'+t);if(el)el.classList.toggle('hidden',t!==tab);});}
+function bindStatic(){qsa('.nav-item').forEach(function(b){b.addEventListener('click',function(){go(b.dataset.page);});});var rt=qs('#btnRefreshTop');if(rt)rt.addEventListener('click',function(){refreshAll(true);toast('Aktualisiert','ok');});var ba=qs('#btnBackupAllTop');if(ba)ba.addEventListener('click',function(){startBackupAll();});var dj=qs('#btnDashJobs');if(dj)dj.addEventListener('click',function(){go('jobs');});var cs=qs('#containerSearch');if(cs)cs.addEventListener('input',function(){renderContainers();});qsa('#containerChips .chip').forEach(function(c){c.addEventListener('click',function(){setContainerFilter(c.dataset.filter);});});var bs=qs('#backupSearch');if(bs)bs.addEventListener('input',function(){renderBackups();});var ea=qs('#btnExpandAll');if(ea)ea.addEventListener('click',function(){expandAll(true);});var ca=qs('#btnCollapseAll');if(ca)ca.addEventListener('click',function(){expandAll(false);});qsa('#jobChips .chip').forEach(function(c){c.addEventListener('click',function(){setJobFilter(c.dataset.filter);});});var asc=qs('#autoScrollChk');if(asc)asc.addEventListener('change',function(){uiState.jobAutoScroll=asc.checked;});var hf=qs('#btnHideFinished');if(hf)hf.addEventListener('click',function(){hideFinishedJobs();});qsa('#typeTiles .tile').forEach(function(t){t.addEventListener('click',function(){setBackupType(t.dataset.type);});t.addEventListener('keydown',function(e){if(e.key===' '||e.key==='Enter'){e.preventDefault();setBackupType(t.dataset.type);}});});qsa('[data-pw]').forEach(function(b){b.addEventListener('click',function(){togglePw(b.getAttribute('data-pw'),b);});});var sch=qs('#schedule');if(sch)sch.addEventListener('input',function(){var el=qs('#schedule');settingsStore.data.schedule=el.value;settingsStore.dirty=true;validateCronLive(false);});qsa('#schedulePresets .cron-preset').forEach(function(p){p.addEventListener('click',function(){setSchedule(p.dataset.cron);});});var par=qs('#parallel');if(par)par.addEventListener('input',function(){var o=qs('#parallelOut');if(o)o.textContent=par.value;settingsStore.data.parallel=par.value;settingsStore.dirty=true;});var liveIds=['smb_share','smb_path','s3_bucket','s3_path'];liveIds.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',updateRemotePreview);});var tb=qs('#testBtn');if(tb)tb.addEventListener('click',testConnection);var sb=qs('#saveBtn');if(sb)sb.addEventListener('click',saveSettings);qsa('#settingsNav button').forEach(function(b){b.addEventListener('click',function(){setSettingsTab(b.dataset.tab);});});qsa('[data-ico]').forEach(function(el){el.innerHTML=icon(el.dataset.ico);});}
+function boot(){bindStatic();var h='';try{h=(window.location.hash||'').replace('#','');}catch(e){}if(!PAGE_META[h])h='dashboard';syncTypeTiles();updateRemotePreview();validateCronLive(false);renderDashboard();renderContainers();renderJobs();go(h||'dashboard');refreshAll(true);loadSettings().catch(function(){});Ticker.start();}
+if(typeof module!=='undefined'&&module.exports){module.exports={validateCron:validateCron,cronFieldOk:cronFieldOk,backupTs:backupTs,backupEpochMs:backupEpochMs,fmtSize:fmtSize,fmtTime:fmtTime,fmtAge:fmtAge,esc:esc,friendlyError:friendlyError,summarizeResult:summarizeResult,jobProgress:jobProgress,jobElapsed:jobElapsed,settingsStore:settingsStore,jobStore:jobStore,dataStore:dataStore,DEFAULT_SETTINGS:DEFAULT_SETTINGS,SECRET_MASK:SECRET_MASK};}
+if(typeof document!=='undefined'&&document.readyState){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();}
 </script>
 </body>
 </html>
