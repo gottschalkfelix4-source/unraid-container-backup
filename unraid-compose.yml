@@ -6,7 +6,9 @@
 # Alternativ: Unraid-Template template/dockguard.xml verwenden.
 services:
   dockguard:
-    image: dockguard:latest
+    # Fertiges Image aus der GitHub Container Registry (kein lokaler Build nötig).
+    # Lokal selbst gebaut (./build.sh): gleicher Name, daher einfach austauschbar.
+    image: ghcr.io/gottschalkfelix4-source/unraid-container-backup:latest
     container_name: dockguard
     ports:
       - "8080:8080"

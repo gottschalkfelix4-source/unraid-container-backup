@@ -56,13 +56,17 @@ Jedes Backup eines Containers ist eine einzelne `.tar`-Datei im Speicherziel:
 
 ## Installation
 
-### 1. Image bauen
+### 1. Image
 
-Auf dem Unraid-Host (oder einem anderen Docker-Host):
+Das Image liegt fertig in der **GitHub Container Registry** und wird bei jedem Push auf `main` automatisch per GitHub Actions neu gebaut – auf Unraid ist **kein Build nötig**:
+
+`ghcr.io/gottschalkfelix4-source/unraid-container-backup:latest`
+
+Selbst bauen (nur für eigene Anpassungen nötig) – `build.sh` vergibt denselben Namen wie das Template, damit auch ein lokaler Build direkt verwendet wird:
 
 ```bash
-./build.sh
-# oder: docker build -t dockguard:latest .
+./build.sh              # baut ghcr.io/...:latest + Alias dockguard:latest
+./build.sh --push       # optional: nach docker login direkt nach GHCR pushen
 ```
 
 ### 2. Unraid-Template (Community Apps) – Minimal-Setup
@@ -201,3 +205,12 @@ python tests/test_smoke.py        # 64 Tests: Backend-Logik, Sicherheit, Restore
 - GPU-Passthrough (DeviceRequests) wird übernommen, sofern der Treiber auf dem Host verfügbar ist.
 - Der Restore überschreibt vorhandene Daten an den Originalpfaden – deshalb gibt es in der UI eine Bestätigung.
 - Sicherheits-Hinweis: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host. Nur im vertrauenswürdigen LAN betreiben (optional per `WEB_PASSWORD` absichern).
+
+## Fehlerbehebung
+
+| Meldung | Ursache & Lösung |
+|---|---|
+| `Unable to find image 'dockguard:latest' locally` bzw. `pull access denied for dockguard` | Die Vorlage zeigt noch auf das alte, namenlose Image `dockguard:latest` – das existiert nur nach einem **lokalen** Build. In der Docker-UI die Vorlage neu laden/aktualisieren (die aktuelle Version nutzt `ghcr.io/…`) **oder** das Image auf dem Server selbst bauen: `git clone https://github.com/gottschalkfelix4-source/unraid-container-backup.git && cd unraid-container-backup && ./build.sh`. |
+| `denied`/`unauthorized` beim Pull von `ghcr.io/…` | Das GHCR-Package ist (noch) privat. Einmalig umstellen: GitHub → Repository → **Packages** → `unraid-container-backup` → *Package settings* → **Change visibility → Public**. |
+| Container läuft, Web-UI aber nicht erreichbar | Port-Mapping prüfen (`8080` laut Template) und `docker logs dockguard` ansehen. |
+| „Ziel nicht erreichbar“ beim Verbindungstest | Zugangsdaten und Netzwerk prüfen – rclone spricht SMB/S3 direkt aus dem Container heraus an, es ist kein Host-Mount nötig. |

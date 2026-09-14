@@ -11,13 +11,13 @@ Das Backup-Ziel wird direkt aus dem Container heraus erreicht (rclone spricht se
 
 Jedes Backup ist eine einzelne .tar-Datei mit vollständigem docker inspect, allen Bind-Mounts/Volumes und dem Unraid-Community-App-Template. Der One-Click-Restore stellt Daten an den Originalpfaden, das Template und die exakte Container-Konfiguration (Image, Ports, Environment, Netzwerk, Labels) wieder her – auch auf einem frischen Server (fehlende Docker-Netzwerke werden automatisch rekonstruiert). Uploads laufen atomar mit optionaler Größenverifizierung.
 
-ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host – nur im vertrauenswürdigen LAN betreiben. Image lokal bauen: ./build.sh (bzw. docker build -t dockguard:latest .)</Overview>
+ACHTUNG: Der Container erhält den Docker-Socket und damit volle Kontrolle über den Host – nur im vertrauenswürdigen LAN betreiben. Das fertige Image liegt in der GitHub Container Registry (ghcr.io/gottschalkfelix4-source/unraid-container-backup:latest) und wird beim Start automatisch gezogen – es ist kein lokaler Build nötig. Selbst bauen (optional): ./build.sh</Overview>
   <Category>Backup:Utilities:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <Icon>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/icon.png</Icon>
   <TemplateURL>https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml</TemplateURL>
-  <Registry>https://github.com/gottschalkfelix4-source/unraid-container-backup</Registry>
-  <Repository>dockguard:latest</Repository>
+  <Registry>https://github.com/gottschalkfelix4-source/unraid-container-backup/pkgs/container/unraid-container-backup</Registry>
+  <Repository>ghcr.io/gottschalkfelix4-source/unraid-container-backup:latest</Repository>
   <Privileged>false</Privileged>
   <RequiresVariant>false</RequiresVariant>
   <BlkioWeight>500</BlkioWeight>
