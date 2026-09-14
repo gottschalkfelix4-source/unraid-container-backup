@@ -78,18 +78,33 @@ Alles Weitere – Speicher-Ziel (SMB/S3), Zugangsdaten, Zeitplan, Aufbewahrung, 
 
 **Setup in 3 Minuten:**
 
-1. **Template auf dem Server anlegen** – direkt im Unraid-Terminal (oder per SSH) ausführen; der Zielordner liegt auf dem USB-Stick und übersteht Reboots:
+1. **Template auf dem Server anlegen** – einmalig im Unraid-Terminal (oder per SSH) ausführen. Der Zielordner liegt auf dem USB-Stick und übersteht Reboots.
+
+   **Weg 1 – Repo liegt auf dem Server (empfohlen, Copy-Paste):**
 
    ```bash
-   # Variante A – die Projekt-/Repo-Datei liegt auf dem Server (git clone oder Samba):
-   cp template/dockguard.xml /boot/config/plugins/dockerMan/templates-user/
+   cd /mnt/user/appdata/unraid-container-backup    # <- Pfad zum geklonten Repo anpassen
+   mkdir -p /boot/config/plugins/dockerMan/templates-user
+   cp -v template/dockguard.xml /boot/config/plugins/dockerMan/templates-user/
+   ```
 
-   # Variante B – direkt von GitHub herunterladen (funktioniert, sobald das Repo
-   # öffentlich ist; bei privatem Repo Variante A nutzen oder ein GitHub-Token anhängen:
-   # curl -fsSL -H "Authorization: Bearer <token>" -o ...):
+   **Weg 2 – direkt von GitHub** (das Repo ist privat, daher mit Token):
+
+   ```bash
+   TOKEN=ghp_deinToken    # <- GitHub-Token mit "repo"-Recht (Settings -> Developer settings -> Personal access tokens)
+   curl -fsSL -H "Authorization: token $TOKEN" \
+     -o /boot/config/plugins/dockerMan/templates-user/dockguard.xml \
+     https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml
+   ```
+
+   Sobald das Repo öffentlich ist, genügt Weg 2 auch ohne Token:
+
+   ```bash
    curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/dockguard.xml \
      https://raw.githubusercontent.com/gottschalkfelix4-source/unraid-container-backup/main/template/dockguard.xml
    ```
+
+   Danach erscheint die Vorlage sofort in der Docker-UI unter „Add Container“.
 
 2. In der Docker-UI („Add Container“) die Vorlage **dockguard** wählen – Port und AppData sind bereits passend vorbelegt, Container starten
 3. Web-UI unter `http://<unraid-ip>:8080` öffnen und im Dashboard auf **„Jetzt einrichten“** klicken – Ziel eintragen, **„Verbindung testen“**, speichern, fertig
