@@ -2,8 +2,10 @@
 
 - Werte aus SETTINGS_FILE (Standard /config/settings.json) überschreiben die
   Umgebungsvariablen und sind über die Web-UI änderbar.
-- Geheimnisse (Passwörter/Secret-Keys) werden in to_dict() maskiert und beim
-  Speichern via update() wiederverwendet, solange die Maske zurückkommt.
+- Geheimnisse (Passwörter/Secret-Keys) werden in to_dict() für die Web-UI
+  maskiert (SECRET_MASK); in die Einstellungsdatei werden sie dagegen im
+  Klartext geschrieben (Datei mit Rechten 0600), damit sie einen Neustart
+  überleben. Eine zurückgeschickte Maske überschreibt nie einen echten Wert.
 - App startet auch mit unvollständiger Konfiguration; strikte Validierung
   erfolgt erst beim Speichern über die Web-UI bzw. in der CLI.
 """
@@ -102,10 +104,17 @@ class Config:
 
     @classmethod
     def from_dict(cls, data):
-        """Aktuelle Konfiguration + Überlagerung, ohne zu speichern (z. B. zum Testen)."""
+        """Aktuelle Konfiguration + Überlagerung, ohne zu speichern (z. B. zum Testen).
+
+        Eine zurückgeschickte Maske (SECRET_MASK) lässt den bestehenden Wert
+        unverändert – sonst würde beim Verbindungstest die Maske als Passwort
+        verwendet.
+        """
         cfg = cls()
         for k in CONFIGURABLE_KEYS:
             if k in data and data[k] is not None:
+                if k in SECRET_KEYS and data[k] == SECRET_MASK:
+                    continue
                 setattr(cfg, k, data[k])
         cfg._parse()
         return cfg
@@ -118,8 +127,11 @@ class Config:
             return
         if isinstance(data, dict):
             for k in CONFIGURABLE_KEYS:
-                if k in data and data[k] is not None:
-                    setattr(self, k, data[k])
+                if k not in data or data[k] is None:
+                    continue
+                if k in SECRET_KEYS and data[k] == SECRET_MASK:
+                    continue  # Maske aus Altbestand -> Default/Env behalten
+                setattr(self, k, data[k])
 
     def _parse(self):
         self.backup_type = str(self.backup_type or "smb").strip().lower()
@@ -183,10 +195,18 @@ class Config:
             raise ValueError(f"Ungültiger Zeitplan '{self.schedule}': {exc}")
 
     def to_dict(self):
+        """Werte für die Web-UI – Geheimnisse nur als Maske."""
+        return self._collect(mask_secrets=True)
+
+    def to_storage_dict(self):
+        """Werte für die Einstellungsdatei – inkl. echter Geheimnisse."""
+        return self._collect(mask_secrets=False)
+
+    def _collect(self, mask_secrets):
         d = {}
         for k in CONFIGURABLE_KEYS:
             v = getattr(self, k)
-            if k in SECRET_KEYS and v:
+            if mask_secrets and k in SECRET_KEYS and v:
                 v = SECRET_MASK
             d[k] = v
         d["exclude"] = ",".join(self.exclude)
@@ -217,7 +237,11 @@ class Config:
                 if conf_dir:
                     os.makedirs(conf_dir, exist_ok=True)
                 with open(path, "w", encoding="utf-8") as f:
-                    json.dump(self.to_dict(), f, indent=2)
+                    json.dump(self.to_storage_dict(), f, indent=2)
+                try:
+                    os.chmod(path, 0o600)  # enthält Geheimnisse im Klartext
+                except OSError:
+                    pass
                 self.settings_file = path
                 return
             except OSError:

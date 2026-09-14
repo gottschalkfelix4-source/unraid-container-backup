@@ -9,7 +9,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.config import Config
+from app.config import Config, SECRET_MASK
 from app.storage import Storage
 from app import backup as backup_mod
 from app import restore as restore_mod
@@ -420,6 +420,37 @@ expected2 = dt.datetime(2026, 9, 13, 5, 0, 0, tzinfo=dt.timezone.utc).timestamp(
 check("mtime bevorzugt",
       _backup_epoch({"id": "jellyfin_20260913_030000.tar", "mtime": "2026-09-13T05:00:00Z"}) == expected2)
 check("Unparsbar -> 0", _backup_epoch({"id": "jellyfin_broken", "mtime": ""}) == 0)
+
+# ---------- 12. Neues: Secrets in settings.json (Persistenz) ----------
+print("== Secret-Persistenz in settings.json ==")
+sec_file = os.path.join(root, "settings", "settings.json")
+os.environ["SETTINGS_FILE"] = sec_file
+os.environ.update({"BACKUP_TYPE": "smb", "SMB_HOST": "h", "SMB_USER": "u",
+                   "SMB_PASS": "geheim", "SMB_SHARE": "s"})
+cfgs = Config()
+cfgs.validate()
+cfgs.update({"keep": 5})  # löst Speichern aus
+saved = json.loads(open(sec_file, encoding="utf-8").read())
+check("Echtes Secret in settings.json", saved.get("smb_pass") == "geheim")
+check("Maske wird nicht persistiert", saved.get("smb_pass") != SECRET_MASK)
+check("Datei nur für Eigentümer lesbar",
+      (os.stat(sec_file).st_mode & 0o777) == 0o600)
+
+del os.environ["SMB_PASS"]  # Neustart ohne Env-Passwort: nur die Datei zählt
+reloaded = Config()
+check("Secret überlebt Neustart", reloaded.smb_pass == "geheim")
+check("to_dict liefert weiterhin nur die Maske",
+      reloaded.to_dict()["smb_pass"] == SECRET_MASK)
+
+partial = Config.from_dict({"smb_pass": SECRET_MASK, "s3_secret_key": SECRET_MASK})
+check("from_dict ignoriert Maske (Verbindungstest)", partial.smb_pass == "geheim")
+
+os.environ["SMB_PASS"] = "aus_env"
+with open(sec_file, "w", encoding="utf-8") as f:
+    json.dump({"smb_pass": SECRET_MASK, "s3_secret_key": SECRET_MASK}, f)
+legacy = Config()
+check("Maske in Altbestand überschreibt Env nicht", legacy.smb_pass == "aus_env")
+os.environ["SMB_PASS"] = "p"
 
 # ---------- Zusammenfassung ----------
 failed = [n for n, ok in PASS if not ok]

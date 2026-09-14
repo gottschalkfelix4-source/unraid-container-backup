@@ -32,7 +32,7 @@ DockGuard ist ein Backup-Tool als Docker-Container für Unraid. Es sichert jeden
 | 🔐 **Secret-Masking** | Passwörter & Access-Keys werden in der Web-UI nie im Klartext angezeigt |
 | 🌐 **Restore auf frischem Server** | Fehlende Docker-Netzwerke (inkl. Aliase) werden automatisch rekonstruiert |
 | 🖥️ **Komplette Web-UI** | Dashboard, Container-Karten, Backup-Verwaltung, Einstellungs-Assistent, Live-Job-Logs – ohne externe Abhängigkeiten |
-| 🧪 **Umfangreich getestet** | 57 automatische Tests für Backup-/Restore-Logik, Sicherheit und UI |
+| 🧪 **Umfangreich getestet** | 64 automatische Tests für Backup-/Restore-Logik, Sicherheit und UI |
 
 ## Funktionsweise
 
@@ -155,8 +155,10 @@ Oder direkt [`unraid-compose.yml`](unraid-compose.yml) verwenden.
 
 > **Passwörter:** SMB-Passwort und S3-Secret-Key werden in der Web-UI nur
 > maskiert angezeigt (`********`) und nie im Klartext an den Browser
-> zurückgegeben. Ein gespeicherter Wert bleibt beim Speichern erhalten,
-> solange die Maske unverändert zurückgeschickt wird.
+> zurückgegeben. Für Backup/Restore werden sie in `/config/settings.json`
+> gespeichert (die Datei wird mit Rechten `0600` angelegt) und überleben so
+> einen Neustart. Eine aus der UI zurückgeschickte Maske überschreibt niemals
+> einen gespeicherten Wert – auch nicht bei „Verbindung testen“.
 
 ## Web-UI
 
@@ -187,7 +189,7 @@ docker exec -it dockguard python -m app.cli delete jellyfin jellyfin_20260901_03
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python tests/test_smoke.py        # 57 Tests: Backend-Logik, Sicherheit, Restore
+python tests/test_smoke.py        # 64 Tests: Backend-Logik, Sicherheit, Restore
 ```
 
 ## Grenzen & Hinweise
